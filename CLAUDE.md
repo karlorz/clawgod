@@ -15,3 +15,4 @@
 | `{WIKI_VAULT}/projects/clawgod/work/2026-07-18-fork-isolation/spec.md` | Fork isolation design |
 | `{WIKI_VAULT}/projects/clawgod/work/2026-07-18-fork-isolation/plan.md` | Implementation plan |
 | `{WIKI_VAULT}/projects/clawgod/work/2026-07-18-fork-isolation/log.md` | Work log |
+| `{WIKI_VAULT}/queries/2026-07-18-clawgod-lean-mode-flags-tools.md` | Lean on/max flags & denied tools (research) |
