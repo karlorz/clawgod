@@ -7,7 +7,7 @@ set -e
 #  Downloads Claude Code from npm, applies patches, replaces claude command
 #
 #  用法:
-#    curl -fsSL https://raw.githubusercontent.com/0Chencc/clawgod/main/install.sh | bash
+#    curl -fsSL https://github.com/karlorz/clawgod/releases/latest/download/install.sh | bash
 #    # 或
 #    bash install.sh [--version 2.1.89] [--no-upgrade]
 # ─────────────────────────────────────────────────────────
@@ -20,6 +20,12 @@ LEAN_OFF="${CLAWGOD_LEAN_OFF:-}"
 LEAN_ON="${CLAWGOD_LEAN_ON:-}"
 LEAN_MAX="${CLAWGOD_LEAN_MAX:-}"
 CLAWGOD_SELF_VERSION="1.6.1"
+
+# Product identity — install/self-update must never hit upstream OSS remote.
+# Keep embedded wrapper/patcher URL strings in sync with this value (quoted HEREDOCs do not expand shell vars).
+CLAWGOD_GITHUB_REPO="karlorz/clawgod"
+CLAWGOD_RELEASE_BASE="https://github.com/${CLAWGOD_GITHUB_REPO}/releases/latest/download"
+CLAWGOD_API_LATEST="https://api.github.com/repos/${CLAWGOD_GITHUB_REPO}/releases/latest"
 
 # Parse args
 while [[ $# -gt 0 ]]; do
@@ -936,7 +942,8 @@ try {
       process.stderr.write('[clawgod] v' + _uc.v + ' available (installed: v' + _localVer + ") — run 'claude update' to upgrade\n");
     }
     if (!_uc || Date.now() - (_uc.t || 0) > 86400000) {
-      fetch('https://api.github.com/repos/0Chencc/clawgod/releases/latest', {
+      // Keep in sync with CLAWGOD_GITHUB_REPO in install.sh (quoted HEREDOC).
+      fetch('https://api.github.com/repos/karlorz/clawgod/releases/latest', {
         headers: { 'User-Agent': 'clawgod' },
         signal: AbortSignal.timeout(5000),
       }).then(function(r) { return r.json(); }).then(function(d) {
@@ -1107,7 +1114,8 @@ const patches = [
       // arg-quoting; payload must be UTF-16LE base64.
       const psScript =
         "$p=if($env:HTTPS_PROXY){$env:HTTPS_PROXY}elseif($env:HTTP_PROXY){$env:HTTP_PROXY}else{$null};" +
-        "$u='https://github.com/0Chencc/clawgod/releases/latest/download/install.ps1';" +
+        // Keep in sync with CLAWGOD_GITHUB_REPO in install.sh (quoted HEREDOC).
+        "$u='https://github.com/karlorz/clawgod/releases/latest/download/install.ps1';" +
         "if($p){iex(irm -Proxy $p $u)}else{iex(irm $u)}";
       const psB64 = Buffer.from(psScript, 'utf16le').toString('base64');
       return (
@@ -1122,7 +1130,7 @@ const patches = [
         `if(_ua.includes("--lean-max"))process.env.CLAWGOD_LEAN_MAX="1";` +
         `process.stderr.write("[clawgod] 'claude update' is handled by clawgod self-update.\\n[clawgod] To leave clawgod and use vanilla update: bash ~/.clawgod/install.sh --uninstall\\n[clawgod] Continuing now\\u2026\\n");` +
         `const _w=process.platform==='win32';` +
-        `const _c=_w?['powershell','-NoProfile','-EncodedCommand','${psB64}']:['bash','-c','curl -fsSL https://github.com/0Chencc/clawgod/releases/latest/download/install.sh | bash'];` +
+        `const _c=_w?['powershell','-NoProfile','-EncodedCommand','${psB64}']:['bash','-c','curl -fsSL https://github.com/karlorz/clawgod/releases/latest/download/install.sh | bash'];` +
         `const _r=require('child_process').spawnSync(_c[0],_c.slice(1),{stdio:'inherit',env:process.env});` +
         `process.exit(_r.status||0);`
       );
@@ -1657,7 +1665,7 @@ CLAWGOD_CLI=\"$CLAWGOD_DIR/cli.cjs\"
 BUN_BIN=\"$BUN_BIN\"
 if [ ! -f \"\$CLAWGOD_CLI\" ]; then
   echo \"clawgod: installation at $CLAWGOD_DIR is missing (cli.cjs not found)\" >&2
-  echo \"clawgod: reinstall via  curl -fsSL https://github.com/0Chencc/clawgod/releases/latest/download/install.sh | bash\" >&2
+  echo \"clawgod: reinstall via  curl -fsSL https://github.com/karlorz/clawgod/releases/latest/download/install.sh | bash\" >&2
   echo \"clawgod: or remove this launcher:  rm \\\"\$0\\\"\" >&2
   exit 127
 fi
