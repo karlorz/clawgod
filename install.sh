@@ -22,10 +22,8 @@ LEAN_MAX="${CLAWGOD_LEAN_MAX:-}"
 CLAWGOD_SELF_VERSION="1.6.1"
 
 # Product identity — install/self-update must never hit upstream OSS remote.
-# Keep embedded wrapper/patcher URL strings in sync with this value (quoted HEREDOCs do not expand shell vars).
+# Quoted HEREDOCs cannot expand this; hardcode the same owner/repo in those blobs and keep them in sync.
 CLAWGOD_GITHUB_REPO="karlorz/clawgod"
-CLAWGOD_RELEASE_BASE="https://github.com/${CLAWGOD_GITHUB_REPO}/releases/latest/download"
-CLAWGOD_API_LATEST="https://api.github.com/repos/${CLAWGOD_GITHUB_REPO}/releases/latest"
 
 # Parse args
 while [[ $# -gt 0 ]]; do
@@ -1665,7 +1663,7 @@ CLAWGOD_CLI=\"$CLAWGOD_DIR/cli.cjs\"
 BUN_BIN=\"$BUN_BIN\"
 if [ ! -f \"\$CLAWGOD_CLI\" ]; then
   echo \"clawgod: installation at $CLAWGOD_DIR is missing (cli.cjs not found)\" >&2
-  echo \"clawgod: reinstall via  curl -fsSL https://github.com/karlorz/clawgod/releases/latest/download/install.sh | bash\" >&2
+  echo \"clawgod: reinstall via  curl -fsSL https://github.com/${CLAWGOD_GITHUB_REPO}/releases/latest/download/install.sh | bash\" >&2
   echo \"clawgod: or remove this launcher:  rm \\\"\$0\\\"\" >&2
   exit 127
 fi

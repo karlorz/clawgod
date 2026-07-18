@@ -35,10 +35,8 @@ $BinDir  = Join-Path $env:USERPROFILE ".local\bin"
 $ClawSelfVersion = "1.6.1"
 
 # Product identity — install/self-update must never hit upstream OSS remote.
-# Keep embedded wrapper/patcher URL strings in sync with this value (quoted HEREDOCs do not expand).
+# Quoted here-strings cannot expand this; hardcode the same owner/repo in those blobs and keep them in sync.
 $ClawGodGitHubRepo = "karlorz/clawgod"
-$ClawGodReleaseBase = "https://github.com/$ClawGodGitHubRepo/releases/latest/download"
-$ClawGodApiLatest = "https://api.github.com/repos/$ClawGodGitHubRepo/releases/latest"
 
 # ─── Colors ───────────────────────────────────────────
 
@@ -1640,7 +1638,7 @@ if ($normalizedBunBin.Equals($normalizedUserProfile, [StringComparison]::Ordinal
     # absolute path since %USERPROFILE%-relative expansion doesn't apply.
     $bunPathInCmd = $BunBin
 }
-$launcherContent = "@echo off`r`nif not exist `"$cliPathInCmd`" (`r`n  echo clawgod: cli.cjs not found. Reinstall: irm https://github.com/karlorz/clawgod/releases/latest/download/install.ps1 ^| iex`r`n  exit /b 127`r`n)`r`nif not exist `"$bunPathInCmd`" (`r`n  echo clawgod: bun not found at $bunPathInCmd. Install: https://bun.sh/install`r`n  exit /b 127`r`n)`r`nset `"CLAUDE_CODE_EXECPATH=%~dp0claude.orig.exe`"`r`n`"$bunPathInCmd`" `"$cliPathInCmd`" %*"
+$launcherContent = "@echo off`r`nif not exist `"$cliPathInCmd`" (`r`n  echo clawgod: cli.cjs not found. Reinstall: irm https://github.com/$ClawGodGitHubRepo/releases/latest/download/install.ps1 ^| iex`r`n  exit /b 127`r`n)`r`nif not exist `"$bunPathInCmd`" (`r`n  echo clawgod: bun not found at $bunPathInCmd. Install: https://bun.sh/install`r`n  exit /b 127`r`n)`r`nset `"CLAUDE_CODE_EXECPATH=%~dp0claude.orig.exe`"`r`n`"$bunPathInCmd`" `"$cliPathInCmd`" %*"
 
 # Find and back up original claude
 $claudeCmd = Join-Path $BinDir "claude.cmd"
