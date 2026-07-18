@@ -132,7 +132,8 @@ jobs:
               exit 1
             fi
           done
-          for tool in DesignSync NotebookEdit CronCreate; do
+          # Fork lean-on deny set (NotebookEdit/Cron* are max-only)
+          for tool in DesignSync EnterPlanMode WebFetch WebSearch; do
             if ! grep -q "\"$tool\"" "$settings"; then
               echo "::error::deny tool $tool missing from settings.json"
               cat "$settings"

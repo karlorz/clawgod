@@ -1011,8 +1011,11 @@ if (process.argv.includes('--lean-off') || process.argv.includes('--lean-on') ||
   const _leanOff = join(clawgodDir, '.lean-disabled');
   const _leanMax = join(clawgodDir, '.lean-max');
   const _leanSettings = join(homedir(), '.claude', 'settings.json');
-  const _baseDeny = ['DesignSync','NotebookEdit','PushNotification','RemoteTrigger','CronCreate','CronDelete','CronList'];
-  const _maxDeny = ['EnterPlanMode','ExitPlanMode','SendMessage','ScheduleWakeup','AskUserQuestion','ReportFindings'];
+  // Fork custom lean lists (see docs/fork-changelog.md):
+  // on: DesignSync, PushNotification, RemoteTrigger, EnterPlanMode, WebFetch, WebSearch
+  // max adds: NotebookEdit, Cron*, ExitPlanMode, SendMessage, ScheduleWakeup, AskUserQuestion, ReportFindings
+  const _baseDeny = ['DesignSync','PushNotification','RemoteTrigger','EnterPlanMode','WebFetch','WebSearch'];
+  const _maxDeny = ['NotebookEdit','CronCreate','CronDelete','CronList','ExitPlanMode','SendMessage','ScheduleWakeup','AskUserQuestion','ReportFindings'];
   const _baseFlags = ['disableWorkflows','disableRemoteControl','disableClaudeAiConnectors','disableArtifact'];
   const _maxFlags = ['disableBundledSkills'];
   const _allDeny = new Set([..._baseDeny, ..._maxDeny]);
@@ -1519,7 +1522,7 @@ if ($LeanOff) {
     if (Test-Path $leanMaxFlag) { Remove-Item $leanMaxFlag -Force }
     $leanRemoveScript = @'
 const fs=require("fs"),p=process.argv[1];
-const allDeny=new Set(["DesignSync","NotebookEdit","PushNotification","RemoteTrigger","CronCreate","CronDelete","CronList","EnterPlanMode","ExitPlanMode","SendMessage","ScheduleWakeup","AskUserQuestion","ReportFindings"]);
+const allDeny=new Set(["DesignSync","PushNotification","RemoteTrigger","EnterPlanMode","WebFetch","WebSearch","NotebookEdit","CronCreate","CronDelete","CronList","ExitPlanMode","SendMessage","ScheduleWakeup","AskUserQuestion","ReportFindings"]);
 const allFlags=["disableWorkflows","disableRemoteControl","disableClaudeAiConnectors","disableArtifact","disableBundledSkills"];
 let s={};try{s=JSON.parse(fs.readFileSync(p,"utf8"))}catch{process.exit(0)}
 for(const k of allFlags)delete s[k];
@@ -1544,8 +1547,8 @@ if (-not (Test-Path $leanOffFlag)) {
 const fs = require("fs");
 const settingsPath = process.argv[1];
 const isMax = process.argv[2] === "true";
-const baseDeny = ["DesignSync","NotebookEdit","PushNotification","RemoteTrigger","CronCreate","CronDelete","CronList"];
-const maxDeny = ["EnterPlanMode","ExitPlanMode","SendMessage","ScheduleWakeup","AskUserQuestion","ReportFindings"];
+const baseDeny = ["DesignSync","PushNotification","RemoteTrigger","EnterPlanMode","WebFetch","WebSearch"];
+const maxDeny = ["NotebookEdit","CronCreate","CronDelete","CronList","ExitPlanMode","SendMessage","ScheduleWakeup","AskUserQuestion","ReportFindings"];
 const baseFlags = ["disableWorkflows","disableRemoteControl","disableClaudeAiConnectors","disableArtifact"];
 const maxFlags = ["disableBundledSkills"];
 const deny = isMax ? [...baseDeny, ...maxDeny] : baseDeny;
