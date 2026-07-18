@@ -8,7 +8,7 @@
 
 | 组件 | 提供者 | 解决的问题 |
 |------|--------|-----------|
-| ClawGod | [GitHub](https://github.com/0Chencc/clawgod) | 客户端运行时限制（Layer 0） |
+| ClawGod | [GitHub](https://github.com/karlorz/clawgod) | 客户端运行时限制（Layer 0） |
 | Session Rules | 本文档 `01-session-rules/` | 模型层身份与场景声明（Layer 1） |
 | Scene Router | 本文档 `02-scene-router/` | 动态场景识别（Layer 2） |
 | Guard + Policy | 本文档 `03-guard-policy/` | 工具调用策略（Layer 3） |

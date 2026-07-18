@@ -35,7 +35,7 @@ ClawGod 解决客户端层。Session Rules 解决模型层。Guard 重建可控�
 
 ### 最小配置（5 分钟）
 
-1. 安装 [ClawGod](https://github.com/0Chencc/clawgod) — 解除客户端层限制
+1. 安装 [ClawGod](https://github.com/karlorz/clawgod) — 解除客户端层限制
 2. 复制 `01-session-rules/security-research-context.md` 到 `~/.claude/rules/`
 3. 完成。两层限制同时解除。
 

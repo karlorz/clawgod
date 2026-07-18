@@ -26,13 +26,13 @@
 ### macOS / Linux
 
 ```bash
-curl -fsSL https://github.com/0Chencc/clawgod/releases/latest/download/install.sh | bash
+curl -fsSL https://github.com/karlorz/clawgod/releases/latest/download/install.sh | bash
 ```
 
 ### Windows (PowerShell)
 
 ```powershell
-irm https://github.com/0Chencc/clawgod/releases/latest/download/install.ps1 | iex
+irm https://github.com/karlorz/clawgod/releases/latest/download/install.ps1 | iex
 ```
 
 ### 验证
@@ -161,7 +161,7 @@ CTF 场景的 Guard 策略应该偏宽松：
 exit
 
 # 卸载 ClawGod（如果需要）
-curl -fsSL https://github.com/0Chencc/clawgod/releases/latest/download/install.sh | bash -s -- --uninstall
+curl -fsSL https://github.com/karlorz/clawgod/releases/latest/download/install.sh | bash -s -- --uninstall
 
 # 移除 CTF rules
 rm ~/.claude/rules/ctf-context.md

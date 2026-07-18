@@ -2,11 +2,11 @@
 
 [English](README.md) | [中文](README_ZH.md) | [日本語](README_JP.md)
 
-[![Latest](https://img.shields.io/github/v/release/0chencc/clawgod?style=flat&label=Latest)](https://github.com/0Chencc/clawgod/releases/latest)
-[![Released](https://img.shields.io/github/release-date/0chencc/clawgod?style=flat&label=Released)](https://github.com/0Chencc/clawgod/releases/latest)
-[![Downloads](https://img.shields.io/github/downloads/0chencc/clawgod/total?style=flat&label=Downloads)](https://github.com/0Chencc/clawgod/releases)
-[![Compat](https://img.shields.io/github/actions/workflow/status/0chencc/clawgod/compat-daily.yml?branch=main&style=flat&label=Compat)](https://github.com/0Chencc/clawgod/actions/workflows/compat-daily.yml)
-[![Claude tested](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/0Chencc/clawgod/badges/claude-version.json&style=flat)](https://github.com/0Chencc/clawgod/actions/workflows/compat-daily.yml)
+[![Latest](https://img.shields.io/github/v/release/karlorz/clawgod?style=flat&label=Latest)](https://github.com/karlorz/clawgod/releases/latest)
+[![Released](https://img.shields.io/github/release-date/karlorz/clawgod?style=flat&label=Released)](https://github.com/karlorz/clawgod/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/karlorz/clawgod/total?style=flat&label=Downloads)](https://github.com/karlorz/clawgod/releases)
+[![Compat](https://img.shields.io/github/actions/workflow/status/karlorz/clawgod/compat-daily.yml?branch=main&style=flat&label=Compat)](https://github.com/karlorz/clawgod/actions/workflows/compat-daily.yml)
+[![Claude tested](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/karlorz/clawgod/badges/claude-version.json&style=flat)](https://github.com/karlorz/clawgod/actions/workflows/compat-daily.yml)
 
 > [Claude Code](https://docs.anthropic.com/en/docs/claude-code) ゴッドモード。
 
@@ -27,12 +27,12 @@ ClawGod インストーラ実行**前**に揃えておくもの：
 
 **macOS / Linux:**
 ```bash
-curl -fsSL https://github.com/0Chencc/clawgod/releases/latest/download/install.sh | bash
+curl -fsSL https://github.com/karlorz/clawgod/releases/latest/download/install.sh | bash
 ```
 
 **Windows (PowerShell):**
 ```powershell
-irm https://github.com/0Chencc/clawgod/releases/latest/download/install.ps1 | iex
+irm https://github.com/karlorz/clawgod/releases/latest/download/install.ps1 | iex
 ```
 
 緑のロゴ = パッチ適用済み。オレンジのロゴ = オリジナル。
@@ -147,12 +147,12 @@ claude update --no-upgrade        # ダウンロードせず既存の cli.js に
 
 **macOS / Linux:**
 ```bash
-curl -fsSL https://github.com/0Chencc/clawgod/releases/latest/download/install.sh | bash
+curl -fsSL https://github.com/karlorz/clawgod/releases/latest/download/install.sh | bash
 ```
 
 **Windows:**
 ```powershell
-irm https://github.com/0Chencc/clawgod/releases/latest/download/install.ps1 | iex
+irm https://github.com/karlorz/clawgod/releases/latest/download/install.ps1 | iex
 ```
 
 ClawGod を外して Anthropic 本来の `claude update`（独自に管理されたパスへ書き込み、私たちの launcher を上書きします）を使いたい場合は、先にアンインストールしてください：
@@ -165,23 +165,37 @@ bash ~/.clawgod/install.sh --uninstall
 
 **macOS / Linux:**
 ```bash
-curl -fsSL https://github.com/0Chencc/clawgod/releases/latest/download/install.sh | bash -s -- --uninstall
+curl -fsSL https://github.com/karlorz/clawgod/releases/latest/download/install.sh | bash -s -- --uninstall
 hash -r  # シェルキャッシュをリフレッシュ
 ```
 
 **Windows:**
 ```powershell
-irm https://github.com/0Chencc/clawgod/releases/latest/download/install.ps1 -OutFile install.ps1; .\install.ps1 -Uninstall
+irm https://github.com/karlorz/clawgod/releases/latest/download/install.ps1 -OutFile install.ps1; .\install.ps1 -Uninstall
 ```
 
 アンインストールは `claude.orig` を `claude` に戻し、`clawgod` エイリアスを削除します。
 
 > インストール・アンインストール後、コマンドがすぐに反映されない場合はターミナルを再起動するか `hash -r` を実行してください。
 
+## 上流 ClawGod からの移行
+
+以前 `0Chencc/clawgod` からインストールした場合は、**この fork のインストーラを一度再実行**してください。`claude update` とバージョン確認が上流を叩かなくなります：
+
+```bash
+curl -fsSL https://github.com/karlorz/clawgod/releases/latest/download/install.sh | bash
+```
+
+```powershell
+irm https://github.com/karlorz/clawgod/releases/latest/download/install.ps1 | iex
+```
+
 ## ライセンス
 
 GPL-3.0 — Anthropic とは無関係です。自己責任でご使用ください。
 
+[0Chencc/clawgod](https://github.com/0Chencc/clawgod)（GPL-3.0）から派生。本 fork のインストール／更新エンドポイントは **[karlorz/clawgod](https://github.com/karlorz/clawgod) のみ** です。
+
 ## Star History
 
-[![Star History Chart](https://api.star-history.com/chart?repos=0Chencc/clawgod&type=date&legend=top-left)](https://www.star-history.com/?repos=0Chencc%2Fclawgod&type=date&legend=top-left)
+[![Star History Chart](https://api.star-history.com/chart?repos=karlorz/clawgod&type=date&legend=top-left)](https://www.star-history.com/?repos=karlorz%2Fclawgod&type=date&legend=top-left)
