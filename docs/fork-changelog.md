@@ -61,6 +61,29 @@ cat ~/.clawgod/.clawgod-version   # expect 1.6.1-0 or newer fork train
 
 ---
 
+## v1.6.1-2 — Claude 2.1.214 patch fix + compat issue auto-open (2026-07-18)
+
+**Base:** fork `v1.6.1-1`. Self-version / tag: `1.6.1-2` / `v1.6.1-2`.
+
+### Patcher (Claude Code 2.1.214)
+
+| Patch | 2.1.214 change | Fix |
+|-------|----------------|-----|
+| **Ultrareview enable** | Flag name moved to `var C="tengu_review_bughunter_config"`; getter is `function X(){return et(C,null)}` | Match string-literal **or** const-ref form; `validate` ensures const is the bughunter flag; still merge `{...cfg, enabled:!0}` |
+| **Auto-mode inline gate** | `!=="anthropicAws"` became `!d6(provider)` helper | Match `!=="firstParty"&&(same!=="anthropicAws"\|!helper(same))…return!1` |
+
+Local verify on extracted 2.1.214: **`26 applied, 7 skipped, 0 failed`**.
+
+### compat-daily auto-issue (this repo)
+
+Upstream only ran issue filing when `github.event_name == 'schedule'`. Manual `workflow_dispatch` / `push` failures never opened a ticket. Fork now:
+
+- Opens/updates issues on **this** repository for any **non-PR** failure
+- Ensures labels `compat-broken` + `bug` exist before create
+- Title still: `compat-daily: broke (claude <version>)`
+
+---
+
 ## v1.6.1-1 — custom lean deny lists + apply parity (2026-07-18)
 
 **Base:** fork `v1.6.1-0`. Self-version: `1.6.1-1`. Tag: `v1.6.1-1` (does not move `v1.6.1` / `v1.6.1-0`).

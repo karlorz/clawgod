@@ -33,7 +33,7 @@ if ($env:CLAWGOD_LEAN_MAX -eq "1") { $LeanMax = [switch]$true }
 $ClawDir = Join-Path $env:USERPROFILE ".clawgod"
 $BinDir  = Join-Path $env:USERPROFILE ".local\bin"
 # Fork patch train: never retag upstream vX.Y.Z — use vX.Y.Z-0, vX.Y.Z-1, …
-$ClawSelfVersion = "1.6.1-1"
+$ClawSelfVersion = "1.6.1-2"
 
 # Product identity — install/self-update must never hit upstream OSS remote.
 # Quoted here-strings cannot expand this; hardcode the same owner/repo in those blobs and keep them in sync.
@@ -1155,12 +1155,21 @@ const patches = [
     sentinel: 'name:"ultraplan"',
   },
   {
+    // ≤v2.1.213: string-literal GrowthBook getter; v2.1.214+: var C="tengu_…"; return et(C,null)
     name: 'Ultrareview enable',
-    pattern: /function ([\w$]+)\(\)\{return ([\w$]+)\("tengu_review_bughunter_config",null\)(\?\.enabled===!0)?\}/g,
-    replacer: (m, fn, getter, gate) =>
-      gate
-        ? `function ${fn}(){return!0}`
-        : `function ${fn}(){let _r=${getter}("tengu_review_bughunter_config",null);return _r?{..._r,enabled:!0}:{enabled:!0}}`,
+    pattern: /function ([\w$]+)\(\)\{return ([\w$]+)\((?:"tengu_review_bughunter_config"|([\w$]+)),null\)(\?\.enabled===!0)?\}/g,
+    validate: (full, code) => {
+      if (full.includes('"tengu_review_bughunter_config"')) return true;
+      const m = full.match(/return [\w$]+\(([\w$]+),null\)/);
+      if (!m) return false;
+      return new RegExp('(?:var |let |const )?' + m[1].replace(/\$/g, '\\$') + '="tengu_review_bughunter_config"').test(code);
+    },
+    unique: true,
+    replacer: (m, fn, getter, constName, gate) => {
+      if (gate) return `function ${fn}(){return!0}`;
+      const arg = constName || '"tengu_review_bughunter_config"';
+      return `function ${fn}(){let _r=${getter}(${arg},null);return _r?{..._r,enabled:!0}:{enabled:!0}}`;
+    },
     sentinel: '"tengu_review_bughunter_config"',
   },
   {
@@ -1222,8 +1231,9 @@ const patches = [
     //   if(q!=="firstParty"&&q!=="anthropicAws"&&($==="claude-opus-4-6"||…))return!1;
     //   [^;]* absorbs the optional &&(…) tail safely (no semicolons inside
     //   the if-condition).
+    // v2.1.214+: anthropicAws compare became !d6(provider) helper call
     name: 'Auto-mode unlock for third-party API (inline gate)',
-    pattern: /if\(([\w$]+)!=="firstParty"&&\1!=="anthropicAws"[^;]*\)return!1;/g,
+    pattern: /if\(([\w$]+)!=="firstParty"&&(?:\1!=="anthropicAws"|![\w$]+\(\1\))[^;]*\)return!1;/g,
     replacer: () => '',
     sentinel: '!=="firstParty"&&',
   },

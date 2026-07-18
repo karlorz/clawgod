@@ -212,47 +212,63 @@ jobs:
           git push -fq "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:badges
           echo "Published badge: claude $version"
 
-      - name: Open / update issue on scheduled failure
-        if: failure() && github.event_name == 'schedule'
+      # Upstream only opened issues on cron (`schedule`). Manual / push runs
+      # (workflow_dispatch, push to main) therefore never filed a ticket —
+      # which is why this fork saw red compat without an auto-issue.
+      # Open/update on this repository for any non-PR failure.
+      - name: Open / update issue on failure
+        if: failure() && github.event_name != 'pull_request'
         uses: actions/github-script@v7
         with:
           script: |
             const fs = require('fs');
             const path = require('path');
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
             const stamp = path.join(process.env.HOME, '.clawgod', '.source-version');
             const claudeVersion = fs.existsSync(stamp)
               ? fs.readFileSync(stamp, 'utf8').trim()
               : 'unknown';
             const title = `compat-daily: broke (claude ${claudeVersion})`;
-            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const runUrl = `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`;
+            const event = context.eventName;
+
+            // Ensure labels exist (createIssue fails if they do not).
+            for (const [name, color] of [['compat-broken', 'e4e669'], ['bug', 'd73a4a']]) {
+              try {
+                await github.rest.issues.getLabel({ owner, repo, name });
+              } catch (e) {
+                if (e.status !== 404) throw e;
+                await github.rest.issues.createLabel({
+                  owner, repo, name, color,
+                  description: name === 'bug' ? 'Something is broken' : 'compat-daily regression',
+                });
+              }
+            }
+
             const { data: open } = await github.rest.issues.listForRepo({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              state: 'open',
-              labels: 'compat-broken',
-              per_page: 100,
+              owner, repo, state: 'open', labels: 'compat-broken', per_page: 100,
             });
             const dup = open.find(i => i.title === title);
             if (dup) {
               await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: dup.number,
-                body: `Re-failed ${new Date().toISOString().slice(0,10)} — ${runUrl}`,
+                owner, repo, issue_number: dup.number,
+                body: `Re-failed ${new Date().toISOString().slice(0,10)} (event=\`${event}\`) — ${runUrl}`,
               });
+              core.info(`Commented on existing issue #${dup.number}`);
             } else {
-              await github.rest.issues.create({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                title,
+              const { data: issue } = await github.rest.issues.create({
+                owner, repo, title,
                 labels: ['compat-broken', 'bug'],
                 body: [
-                  `Daily compatibility run failed on \`ubuntu-latest\`.`,
+                  `Compatibility run failed on \`ubuntu-latest\`.`,
                   ``,
                   `- Claude binary: \`${claudeVersion}\``,
+                  `- Event: \`${event}\``,
                   `- Run: ${runUrl}`,
                   ``,
-                  `Auto-opened by \`.github/workflows/compat-daily.yml\`.`,
+                  `Auto-opened by \`.github/workflows/compat-daily.yml\` on **this** repository.`,
                 ].join('\n'),
               });
+              core.info(`Opened issue #${issue.number}`);
             }

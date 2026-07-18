@@ -20,7 +20,7 @@ LEAN_OFF="${CLAWGOD_LEAN_OFF:-}"
 LEAN_ON="${CLAWGOD_LEAN_ON:-}"
 LEAN_MAX="${CLAWGOD_LEAN_MAX:-}"
 # Fork patch train: never retag upstream vX.Y.Z — use vX.Y.Z-0, vX.Y.Z-1, …
-CLAWGOD_SELF_VERSION="1.6.1-1"
+CLAWGOD_SELF_VERSION="1.6.1-2"
 
 # Product identity — install/self-update must never hit upstream OSS remote.
 # Quoted HEREDOCs cannot expand this; hardcode the same owner/repo in those blobs and keep them in sync.
@@ -1033,21 +1033,24 @@ const patches = [
   },
   {
     // ≤v2.1.110: function X(){return Y("tengu_review_bughunter_config",null)?.enabled===!0}
-    // v2.1.119+: function X(){return Y("tengu_review_bughunter_config",null)} — bare getter
-    //            and the gate at function Z(){return X()?.enabled===!0} elsewhere.
-    // v2.1.152+: same bare-getter shape, but the returned config object now also
-    //            feeds OIH/ca/Tm4 helpers that read .cost_note / .duration_note /
-    //            .model. Earlier replacer returned `{enabled:!0}` flat — that
-    //            stripped those fields, and some downstream init path read .model
-    //            then hung the boot before the trust dialog ever rendered
-    //            (issue #86, observed on 2.1.152). Preserve the original config
-    //            shape and only force-flip the enabled flag.
+    // v2.1.119–213: function X(){return Y("tengu_review_bughunter_config",null)} bare getter
+    // v2.1.214+:    var C="tengu_review_bughunter_config"; function X(){return et(C,null)}
+    //               (flag name hoisted into a const; call uses the identifier).
+    // Preserve original config shape and only force-flip enabled (issue #86).
     name: 'Ultrareview enable',
-    pattern: /function ([\w$]+)\(\)\{return ([\w$]+)\("tengu_review_bughunter_config",null\)(\?\.enabled===!0)?\}/g,
-    replacer: (m, fn, getter, gate) =>
-      gate
-        ? `function ${fn}(){return!0}`
-        : `function ${fn}(){let _r=${getter}("tengu_review_bughunter_config",null);return _r?{..._r,enabled:!0}:{enabled:!0}}`,
+    pattern: /function ([\w$]+)\(\)\{return ([\w$]+)\((?:"tengu_review_bughunter_config"|([\w$]+)),null\)(\?\.enabled===!0)?\}/g,
+    validate: (full, code) => {
+      if (full.includes('"tengu_review_bughunter_config"')) return true;
+      const m = full.match(/return [\w$]+\(([\w$]+),null\)/);
+      if (!m) return false;
+      return new RegExp('(?:var |let |const )?' + m[1].replace(/\$/g, '\\$') + '="tengu_review_bughunter_config"').test(code);
+    },
+    unique: true,
+    replacer: (m, fn, getter, constName, gate) => {
+      if (gate) return `function ${fn}(){return!0}`;
+      const arg = constName || '"tengu_review_bughunter_config"';
+      return `function ${fn}(){let _r=${getter}(${arg},null);return _r?{..._r,enabled:!0}:{enabled:!0}}`;
+    },
     sentinel: '"tengu_review_bughunter_config"',
   },
   {
@@ -1077,10 +1080,11 @@ const patches = [
     // ≤v2.1.149: if(Y!=="firstParty"&&Y!=="anthropicAws")return!1;
     // v2.1.158+: same shape with model-condition suffix:
     //   if(q!=="firstParty"&&q!=="anthropicAws"&&($==="claude-opus-4-6"||…))return!1;
-    //   [^;]* absorbs the optional &&(…) tail safely (no semicolons inside
-    //   the if-condition).
+    // v2.1.214+: anthropicAws check moved to helper d6(provider):
+    //   if(r!=="firstParty"&&!d6(r)&&(t==="claude-opus-4-6"||…))return!1;
+    // Match both the literal anthropicAws compare and the !helper(var) form.
     name: 'Auto-mode unlock for third-party API (inline gate)',
-    pattern: /if\(([\w$]+)!=="firstParty"&&\1!=="anthropicAws"[^;]*\)return!1;/g,
+    pattern: /if\(([\w$]+)!=="firstParty"&&(?:\1!=="anthropicAws"|![\w$]+\(\1\))[^;]*\)return!1;/g,
     replacer: () => '',
     sentinel: '!=="firstParty"&&',
   },
