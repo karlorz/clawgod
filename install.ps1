@@ -33,7 +33,7 @@ if ($env:CLAWGOD_LEAN_MAX -eq "1") { $LeanMax = [switch]$true }
 $ClawDir = Join-Path $env:USERPROFILE ".clawgod"
 $BinDir  = Join-Path $env:USERPROFILE ".local\bin"
 # Fork patch train: never retag upstream vX.Y.Z — use vX.Y.Z-0, vX.Y.Z-1, …
-$ClawSelfVersion = "1.6.1-0"
+$ClawSelfVersion = "1.6.1-1"
 
 # Product identity — install/self-update must never hit upstream OSS remote.
 # Quoted here-strings cannot expand this; hardcode the same owner/repo in those blobs and keep them in sync.
@@ -1522,7 +1522,9 @@ if ($LeanOff) {
     if (Test-Path $leanMaxFlag) { Remove-Item $leanMaxFlag -Force }
     $leanRemoveScript = @'
 const fs=require("fs"),p=process.argv[1];
-const allDeny=new Set(["DesignSync","PushNotification","RemoteTrigger","EnterPlanMode","WebFetch","WebSearch","NotebookEdit","CronCreate","CronDelete","CronList","ExitPlanMode","SendMessage","ScheduleWakeup","AskUserQuestion","ReportFindings"]);
+const baseDeny=["DesignSync","PushNotification","RemoteTrigger","EnterPlanMode","WebFetch","WebSearch"];
+const maxDeny=["NotebookEdit","CronCreate","CronDelete","CronList","ExitPlanMode","SendMessage","ScheduleWakeup","AskUserQuestion","ReportFindings"];
+const allDeny=new Set([...baseDeny,...maxDeny]);
 const allFlags=["disableWorkflows","disableRemoteControl","disableClaudeAiConnectors","disableArtifact","disableBundledSkills"];
 let s={};try{s=JSON.parse(fs.readFileSync(p,"utf8"))}catch{process.exit(0)}
 for(const k of allFlags)delete s[k];
@@ -1557,10 +1559,18 @@ let s = {};
 try { s = JSON.parse(fs.readFileSync(settingsPath, "utf8")); } catch {}
 let changed = false;
 for (const k of flags) { if (!(k in s)) { s[k] = true; changed = true; } }
+// Match wrapper: if downgrading from max to on, drop max-only keys/denies
+if (!isMax) { for (const k of maxFlags) { if (k in s) { delete s[k]; changed = true; } } }
 if (!s.permissions) s.permissions = {};
 if (!Array.isArray(s.permissions.deny)) s.permissions.deny = [];
 const ex = new Set(s.permissions.deny);
 for (const t of deny) { if (!ex.has(t)) { s.permissions.deny.push(t); changed = true; } }
+if (!isMax) {
+  const maxSet = new Set(maxDeny);
+  const before = s.permissions.deny.length;
+  s.permissions.deny = s.permissions.deny.filter(function(t) { return !maxSet.has(t); });
+  if (s.permissions.deny.length !== before) changed = true;
+}
 if (changed) fs.writeFileSync(settingsPath, JSON.stringify(s, null, 2) + "\n");
 '@
     try {

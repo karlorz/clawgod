@@ -61,9 +61,9 @@ cat ~/.clawgod/.clawgod-version   # expect 1.6.1-0 or newer fork train
 
 ---
 
-## Unreleased — custom lean deny lists (post-`v1.6.1-0`)
+## v1.6.1-1 — custom lean deny lists + apply parity (2026-07-18)
 
-**Base:** fork `v1.6.1-0` lean implementation (lists differ from upstream ClawGod).
+**Base:** fork `v1.6.1-0`. Self-version: `1.6.1-1`. Tag: `v1.6.1-1` (does not move `v1.6.1` / `v1.6.1-0`).
 
 ### Lean `permissions.deny` customization
 
@@ -80,14 +80,14 @@ cat ~/.clawgod/.clawgod-version   # expect 1.6.1-0 or newer fork train
 | **Moved max → on** | `EnterPlanMode` (blocked by default lean) |
 | **New on denies** | `WebFetch`, `WebSearch` (block model web tools on lean **on**) |
 | **Unchanged flags** | Still 4 base `disable*` on fill-if-missing; `disableBundledSkills` max-only |
+| **Install apply parity** | Install-time lean-on now strips max-only flags/denies (same as wrapper), so reinstall/migration matches `claude --lean-on` |
 
 ### Files
 
-- `install.sh` — wrapper toggle + install-time lean apply
-- `install.ps1` — same
+- `install.sh` / `install.ps1` — wrapper toggle + install-time lean apply
 - `.github/workflows/compat-daily.yml` — assert lean-on deny samples (`DesignSync`, `EnterPlanMode`, `WebFetch`, `WebSearch`)
 
-Apply with reinstall or:
+Apply with reinstall from this fork’s release or:
 
 ```bash
 claude --lean-on    # or --lean-max / --lean-off
