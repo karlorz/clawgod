@@ -32,7 +32,8 @@ if ($env:CLAWGOD_LEAN_MAX -eq "1") { $LeanMax = [switch]$true }
 
 $ClawDir = Join-Path $env:USERPROFILE ".clawgod"
 $BinDir  = Join-Path $env:USERPROFILE ".local\bin"
-$ClawSelfVersion = "1.6.1"
+# Fork patch train: never retag upstream vX.Y.Z — use vX.Y.Z-0, vX.Y.Z-1, …
+$ClawSelfVersion = "1.6.1-0"
 
 # Product identity — install/self-update must never hit upstream OSS remote.
 # Quoted here-strings cannot expand this; hardcode the same owner/repo in those blobs and keep them in sync.

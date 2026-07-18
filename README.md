@@ -190,6 +190,22 @@ curl -fsSL https://github.com/karlorz/clawgod/releases/latest/download/install.s
 irm https://github.com/karlorz/clawgod/releases/latest/download/install.ps1 | iex
 ```
 
+## Fork release & CI policy
+
+**Tags (do not override upstream):** Upstream tags such as `v1.6.1` stay frozen at the upstream commit. Fork-only changes based on that line use a **patch train**:
+
+| Kind | Example | Rule |
+|------|---------|------|
+| Upstream release (immutable) | `v1.6.1` | Never move, retag, or re-upload over this tag |
+| First fork patch on that base | `v1.6.1-0` | First own release for this line |
+| Later fork patches | `v1.6.1-1`, `v1.6.1-2`, … | Increment the suffix only |
+
+Release workflow trigger remains `v*` (same as [upstream `release.yml`](https://github.com/0Chencc/clawgod/blob/main/.github/workflows/release.yml)). Install notes use `${{ github.repository }}` → **this** fork only.
+
+**CI parity:** Workflow YAML for `release.yml`, `compat-daily.yml`, and `cache-cleanup-weekly.yml` matches upstream logic; all repo-scoped actions use `github.repository` / `GITHUB_REPOSITORY` (this fork), not `0Chencc/clawgod`.
+
+**Expected compat-daily failure (today):** Upstream broke on Claude Code **2.1.214** (two stale patches: Ultrareview + third-party auto-mode). This fork has **not** fixed those regexes yet, so `compat-daily` on current `@latest` Claude is **expected to fail** the “Assert all patches applied” step (`failed > 0`) — same class of failure as upstream issue #126. Do not treat that red X as a fork-isolation regression until the 2.1.214 patch work lands.
+
 ## License
 
 GPL-3.0 — Not affiliated with Anthropic. Use at your own risk.

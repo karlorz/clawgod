@@ -190,6 +190,12 @@ curl -fsSL https://github.com/karlorz/clawgod/releases/latest/download/install.s
 irm https://github.com/karlorz/clawgod/releases/latest/download/install.ps1 | iex
 ```
 
+## Fork のリリース / CI 方針
+
+- **上流 tag を上書きしない**：`v1.6.1` 等はそのまま。本 fork の変更は `v1.6.1-0`、`v1.6.1-1`…  
+- **CI ロジックは上流と同一**（`release` / `compat-daily` / `cache-cleanup-weekly`）、対象リポジトリは本 fork のみ。  
+- **Claude 2.1.214 では compat-daily は未パッチ修正のため失敗が期待どおり**（上流と同種）。
+
 ## ライセンス
 
 GPL-3.0 — Anthropic とは無関係です。自己責任でご使用ください。

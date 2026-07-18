@@ -1,5 +1,10 @@
 name: Release
 
+# Fork tag policy (karlorz/clawgod):
+#   - Never move or re-publish an upstream-aligned tag (e.g. v1.6.1).
+#   - Fork patches on that line: v1.6.1-0, v1.6.1-1, …
+#   Workflow logic matches upstream; assets/notes always use github.repository.
+
 on:
   push:
     tags:

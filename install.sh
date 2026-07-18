@@ -19,7 +19,8 @@ NO_UPGRADE="${CLAWGOD_NO_UPGRADE:-}"
 LEAN_OFF="${CLAWGOD_LEAN_OFF:-}"
 LEAN_ON="${CLAWGOD_LEAN_ON:-}"
 LEAN_MAX="${CLAWGOD_LEAN_MAX:-}"
-CLAWGOD_SELF_VERSION="1.6.1"
+# Fork patch train: never retag upstream vX.Y.Z — use vX.Y.Z-0, vX.Y.Z-1, …
+CLAWGOD_SELF_VERSION="1.6.1-0"
 
 # Product identity — install/self-update must never hit upstream OSS remote.
 # Quoted HEREDOCs cannot expand this; hardcode the same owner/repo in those blobs and keep them in sync.
