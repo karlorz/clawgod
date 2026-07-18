@@ -1,0 +1,27 @@
+# Local scratch
+logs/
+tmp/
+
+# Dependencies / build
+node_modules/
+web/dist/
+dist/
+*.tgz
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
+*.code-workspace
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# Local agent / session overrides
+.claude.local.md
