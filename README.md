@@ -116,6 +116,8 @@ claude.orig         # Original unpatched version (auto-backed-up)
 
 - **`apiKey` set** → ClawGod injects it as `ANTHROPIC_API_KEY` and isolates from `~/.claude/settings.json`. Works with Anthropic, DeepSeek, and OpenAI-compatible gateways. A non-Anthropic `baseURL` also populates `ANTHROPIC_AUTH_TOKEN` for gateway auth.
 - **`apiKey` empty** → OAuth path. Run `claude auth login` once; `~/.claude` keeps hosting your subagents, skills, and MCP settings.
+- **OpenAI-compat providers** → set `"type": "grok"` or `"type": "openai-compat"` (plus `apiKey` / `baseURL` / `model` as needed). ClawGod starts a local Anthropic↔OpenAI translation proxy so Claude Code can talk to xAI/Grok and other Chat Completions APIs.
+- **One-shot import** → `claude import grok` or `claude import openai-compat` (after install ships `clawgod-import` from this fork’s releases).
 
 ## How it works
 

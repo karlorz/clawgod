@@ -61,6 +61,32 @@ cat ~/.clawgod/.clawgod-version   # expect 1.6.1-0 or newer fork train
 
 ---
 
+## v1.7.0-0 — merge upstream v1.7.0 (2026-07-19)
+
+**Base:** upstream `v1.7.0` (`bbf2eca`) + fork train. Self-version / tag: `1.7.0-0` / `v1.7.0-0`.
+
+### From upstream v1.7.0 (prefer upstream)
+
+| Area | Change |
+|------|--------|
+| **OpenAI-compat proxy** | Local Anthropic Messages ↔ OpenAI Chat Completions proxy (`openai-proxy.cjs`); `provider.json` `type`: `grok` / `openai-compat` |
+| **Provider import CLI** | Rust `clawgod-import` + launcher `claude import` / `clawgod import`; CI `build-import.yml` |
+| **Ultrareview (2.1.214)** | Prefer upstream: patch `rQt`-style gate + optional direct-literal getter (replaces fork-only const-ref Ultrareview matcher from `v1.6.1-2`) |
+| **Auto-mode inline gate** | Same as prior fork fix: `!=="anthropicAws"` **or** `!helper(var)` |
+
+### Fork interest routing kept
+
+| Keep | Detail |
+|------|--------|
+| **Product URLs** | Install / update-check / `claude update` redirect / reinstall / **import binary download** → `karlorz/clawgod` only (`CLAWGOD_GITHUB_REPO` / `$ClawGodGitHubRepo`) |
+| **Lean deny lists** | Custom **on** / **max** tool denylists (EnterPlanMode + Web* on default lean) |
+| **compat-daily** | Auto-open `compat-broken` issues on this repo for any non-PR failure |
+| **Docs / identity** | Fork changelog, rebranded READMEs/web, no CNAME |
+
+Tag policy: never move upstream `v1.7.0`; ship fork as `v1.7.0-0`.
+
+---
+
 ## v1.6.1-2 — Claude 2.1.214 patch fix + compat issue auto-open (2026-07-18)
 
 **Base:** fork `v1.6.1-1`. Self-version / tag: `1.6.1-2` / `v1.6.1-2`.
@@ -73,6 +99,8 @@ cat ~/.clawgod/.clawgod-version   # expect 1.6.1-0 or newer fork train
 | **Auto-mode inline gate** | `!=="anthropicAws"` became `!d6(provider)` helper | Match `!=="firstParty"&&(same!=="anthropicAws"\|!helper(same))…return!1` |
 
 Local verify on extracted 2.1.214: **`26 applied, 7 skipped, 0 failed`**.
+
+**Superseded by `v1.7.0-0`:** Ultrareview matcher replaced by upstream rQt-gate approach; auto-mode inline gate retained (same pattern as upstream).
 
 ### compat-daily auto-issue (this repo)
 
@@ -118,13 +146,13 @@ claude --lean-on    # or --lean-max / --lean-off
 
 ---
 
-## Upstream baseline retained at v1.6.1
+## Upstream baseline retained at v1.7.0
 
-Everything in upstream through `v1.6.1` remains the code base for patches (lean mode machinery, Glob/Grep restore, Cmd+V image paste, etc.). This file only lists **fork deltas** after that point.
+Everything in upstream through `v1.7.0` is the shared code base (OpenAI-compat proxy, provider import, lean mode machinery, Glob/Grep restore, Cmd+V image paste, 2.1.214 patch fixes, etc.). This file only lists **fork deltas** after that point.
 
 When adding a new fork release:
 
-1. Bump self-version and tag per train (`v1.6.1-N` or next upstream line).
+1. Bump self-version and tag per train (`v1.7.0-N` or next upstream line).
 2. Append a section here with features / major changes / deferred items.
 3. Link the section from [README.md](../README.md) only if user-facing; keep long detail here.
 4. Index new wiki work items from root `CLAUDE.md` using `{WIKI_VAULT}/...` placeholders.
