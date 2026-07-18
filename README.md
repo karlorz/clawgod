@@ -180,7 +180,7 @@ Uninstall restores `claude.orig → claude` and removes the `clawgod` alias.
 
 ## Migrating from upstream ClawGod
 
-If you previously installed from `0Chencc/clawgod`, re-run **this** fork’s installer once so `claude update` and version checks stop calling upstream:
+If you previously installed from `0Chencc/clawgod`, **do not rely on `claude update` yet** — the old wrapper still curls upstream. Run **this** fork’s installer **once** from a shell; it rewrites `~/.clawgod/` (wrapper, patcher) and the `claude` / `clawgod` launchers so all later self-updates hit **only** this repo:
 
 ```bash
 curl -fsSL https://github.com/karlorz/clawgod/releases/latest/download/install.sh | bash
@@ -188,6 +188,15 @@ curl -fsSL https://github.com/karlorz/clawgod/releases/latest/download/install.s
 
 ```powershell
 irm https://github.com/karlorz/clawgod/releases/latest/download/install.ps1 | iex
+```
+
+After that one-time reinstall, `claude update` is safe on this machine (still ClawGod self-update → **this** fork’s `install.sh` / `install.ps1`). Verify with:
+
+```bash
+grep -E 'karlorz/clawgod|0Chencc' ~/.clawgod/cli.cjs | head
+# expect karlorz only
+cat ~/.clawgod/.clawgod-version
+# expect 1.6.1-0 (or newer fork train)
 ```
 
 ## Fork release & CI policy
