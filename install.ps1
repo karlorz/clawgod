@@ -1244,6 +1244,17 @@ if (_proxyTypes[config.type]) {
   }
 }
 
+// Host match uses URL hostname (not substring) to avoid false positives
+// (e.g. "notanthropic.com" or query-string bait).
+var _isAnthropicBaseURL = function (u) {
+  try {
+    var h = new URL(String(u)).hostname.toLowerCase();
+    return h === 'anthropic.com' || h.endsWith('.anthropic.com');
+  } catch (e) {
+    return false;
+  }
+};
+
 const hasProviderApiKey = !!config.apiKey;
 
 if (hasProviderApiKey) {
@@ -1251,7 +1262,7 @@ if (hasProviderApiKey) {
   if (config.baseURL) process.env.ANTHROPIC_BASE_URL = config.baseURL;
   if (config.model) process.env.ANTHROPIC_MODEL = config.model;
   if (config.smallModel) process.env.ANTHROPIC_SMALL_FAST_MODEL = config.smallModel;
-  if (config.baseURL && !/anthropic\.com/i.test(config.baseURL)) {
+  if (config.baseURL && !_isAnthropicBaseURL(config.baseURL)) {
     process.env.ANTHROPIC_AUTH_TOKEN ??= config.apiKey;
   }
 } else if (config.baseURL && config.baseURL !== defaultConfig.baseURL) {
@@ -1266,18 +1277,28 @@ if (hasProviderApiKey) {
 // so the cached prefix changes every request and cache hit rate drops to
 // zero. Auto-disable the header whenever baseURL points away from Anthropic.
 // Users can force re-enable with CLAUDE_CODE_ATTRIBUTION_HEADER=1 if needed.
-if (config.baseURL && !/anthropic\.com/i.test(config.baseURL)) {
+if (config.baseURL && !_isAnthropicBaseURL(config.baseURL)) {
   process.env.CLAUDE_CODE_ATTRIBUTION_HEADER ??= '0';
-  try {
-    const _rcSettings = join(homedir(), '.claude', 'settings.json');
-    if (existsSync(_rcSettings)) {
-      const _rcS = JSON.parse(readFileSync(_rcSettings, 'utf8'));
-      if (_rcS.disableRemoteControl) {
-        delete _rcS.disableRemoteControl;
-        writeFileSync(_rcSettings, JSON.stringify(_rcS, null, 2) + '\n');
+  // Remote Control: opt-in only. Upstream auto-cleared lean's
+  // disableRemoteControl for any non-Anthropic baseURL; that silently
+  // re-opened a surface lean deliberately disables. Require explicit
+  // CLAWGOD_ENABLE_REMOTE_CONTROL=1 or provider.json enableRemoteControl:true.
+  var _rcOptIn = process.env.CLAWGOD_ENABLE_REMOTE_CONTROL === '1'
+    || /^true$/i.test(String(process.env.CLAWGOD_ENABLE_REMOTE_CONTROL || ''))
+    || config.enableRemoteControl === true;
+  if (_rcOptIn) {
+    try {
+      const _rcSettings = join(homedir(), '.claude', 'settings.json');
+      if (existsSync(_rcSettings)) {
+        const _rcS = JSON.parse(readFileSync(_rcSettings, 'utf8'));
+        if (_rcS.disableRemoteControl) {
+          delete _rcS.disableRemoteControl;
+          writeFileSync(_rcSettings, JSON.stringify(_rcS, null, 2) + '\n');
+          process.stderr.write('[clawgod] enableRemoteControl: cleared disableRemoteControl in ~/.claude/settings.json\n');
+        }
       }
-    }
-  } catch {}
+    } catch {}
+  }
 }
 
 if (config.timeoutMs) {

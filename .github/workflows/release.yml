@@ -76,9 +76,16 @@ jobs:
       - name: Inject version from tag
         run: |
           ver="${GITHUB_REF_NAME#v}"
+          # Allowlist only: digits/dot core + optional pre-release/fork train
+          # (e.g. 1.7.5, 1.7.5-0). Rejects sed/shell metacharacters in tags.
+          if ! [[ "$ver" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.]+)*$ ]]; then
+            echo "::error::Refusing to inject invalid version from tag: ${GITHUB_REF_NAME}"
+            exit 1
+          fi
           echo "Injecting version: $ver"
-          sed -i "s/^CLAWGOD_SELF_VERSION=\".*\"/CLAWGOD_SELF_VERSION=\"${ver}\"/" install.sh
-          sed -i "s/^\\\$ClawSelfVersion = \"[^\"]*\"/\$ClawSelfVersion = \"${ver}\"/" install.ps1
+          # Use | delimiters so a future pattern change cannot break on /
+          sed -i "s|^CLAWGOD_SELF_VERSION=\".*\"|CLAWGOD_SELF_VERSION=\"${ver}\"|" install.sh
+          sed -i "s|^\\\$ClawSelfVersion = \"[^\"]*\"|\$ClawSelfVersion = \"${ver}\"|" install.ps1
           grep 'CLAWGOD_SELF_VERSION=' install.sh | head -1
           grep 'ClawSelfVersion' install.ps1 | head -1
 

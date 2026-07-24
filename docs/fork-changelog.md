@@ -74,7 +74,15 @@ cat ~/.clawgod/.clawgod-version   # expect 1.6.1-0 or newer fork train
 | **Windows uninstall** | Remove clawgod launcher when no `claude.orig` backup; clean `openai-proxy` + import binary | v1.7.4 |
 | **`fv()` / Bun standalone** | Patch `Bun.isStandaloneExecutable` in source (not runtime monkey-patch); Bun 1.4+ unconfigurable property; compat functional checks | v1.7.3 |
 | **Release version inject** | CI rewrites `CLAWGOD_SELF_VERSION` / `$ClawSelfVersion` from git tag | v1.7.2 |
-| **PSScriptRoot + remote control** | Safe `openai-proxy.cjs` load under `iex`; clear `disableRemoteControl` for third-party `baseURL` | v1.7.1 |
+| **PSScriptRoot** | Safe `openai-proxy.cjs` load under `iex` | v1.7.1 |
+
+### Fork security hardenings (vs upstream)
+
+| Area | Change |
+|------|--------|
+| **Remote Control opt-in** | Upstream cleared `disableRemoteControl` for any non-Anthropic `baseURL`. Fork requires **`CLAWGOD_ENABLE_REMOTE_CONTROL=1`** or `provider.json` **`enableRemoteControl: true`**, and logs when it clears the lean flag. Default lean Remote Control stays off. |
+| **baseURL host match** | Hostname parse (`api.anthropic.com` / `*.anthropic.com`) instead of `/anthropic.com/` substring |
+| **Release tag allowlist** | Inject step rejects tags outside `N.N.N` / fork-train (`1.7.5-0`); uses `|` sed delimiters |
 
 ### Fork interest routing kept
 
