@@ -20,7 +20,8 @@ LEAN_OFF="${CLAWGOD_LEAN_OFF:-}"
 LEAN_ON="${CLAWGOD_LEAN_ON:-}"
 LEAN_MAX="${CLAWGOD_LEAN_MAX:-}"
 # Fork patch train: never retag upstream vX.Y.Z — use vX.Y.Z-0, vX.Y.Z-1, …
-CLAWGOD_SELF_VERSION="1.7.0-0"
+# Placeholder; release workflow injects the git tag (without leading v).
+CLAWGOD_SELF_VERSION="0.0.0-dev"
 
 # Product identity — install/self-update must never hit upstream OSS remote.
 # Quoted HEREDOCs cannot expand this; hardcode the same owner/repo in those blobs and keep them in sync.
@@ -75,7 +76,7 @@ if [ "$UNINSTALL" = "1" ]; then
       info "Removed ClawGod alias ($DIR/clawgod)"
     fi
   done
-  rm -rf "$CLAWGOD_DIR/node_modules" "$CLAWGOD_DIR/vendor" "$CLAWGOD_DIR/bun-runtime" "$CLAWGOD_DIR/cli.original.js" "$CLAWGOD_DIR/cli.original.js.bak" "$CLAWGOD_DIR/cli.original.cjs" "$CLAWGOD_DIR/cli.original.cjs.bak" "$CLAWGOD_DIR/cli.js" "$CLAWGOD_DIR/cli.cjs" "$CLAWGOD_DIR/patch.mjs" "$CLAWGOD_DIR/patch.js" "$CLAWGOD_DIR/extract-natives.mjs" "$CLAWGOD_DIR/post-process.mjs" "$CLAWGOD_DIR/repatch.mjs" "$CLAWGOD_DIR/.source-version"
+  rm -rf "$CLAWGOD_DIR/node_modules" "$CLAWGOD_DIR/vendor" "$CLAWGOD_DIR/bun-runtime" "$CLAWGOD_DIR/cli.original.js" "$CLAWGOD_DIR/cli.original.js.bak" "$CLAWGOD_DIR/cli.original.cjs" "$CLAWGOD_DIR/cli.original.cjs.bak" "$CLAWGOD_DIR/cli.js" "$CLAWGOD_DIR/cli.cjs" "$CLAWGOD_DIR/patch.mjs" "$CLAWGOD_DIR/patch.js" "$CLAWGOD_DIR/extract-natives.mjs" "$CLAWGOD_DIR/post-process.mjs" "$CLAWGOD_DIR/repatch.mjs" "$CLAWGOD_DIR/openai-proxy.cjs" "$CLAWGOD_DIR/clawgod-import" "$CLAWGOD_DIR/.source-version"
   hash -r 2>/dev/null
   info "ClawGod uninstalled"
   echo ""
@@ -1144,6 +1145,19 @@ if (hasProviderApiKey) {
 // Users can force re-enable with CLAUDE_CODE_ATTRIBUTION_HEADER=1 if needed.
 if (config.baseURL && !/anthropic\.com/i.test(config.baseURL)) {
   process.env.CLAUDE_CODE_ATTRIBUTION_HEADER ??= '0';
+  // Third-party proxies (headroom, etc.) often require remote control.
+  // Lean mode sets disableRemoteControl:true in settings.json — undo it
+  // when the user is routing through a non-Anthropic endpoint.
+  try {
+    const _rcSettings = join(homedir(), '.claude', 'settings.json');
+    if (existsSync(_rcSettings)) {
+      const _rcS = JSON.parse(readFileSync(_rcSettings, 'utf8'));
+      if (_rcS.disableRemoteControl) {
+        delete _rcS.disableRemoteControl;
+        writeFileSync(_rcSettings, JSON.stringify(_rcS, null, 2) + '\n');
+      }
+    }
+  } catch {}
 }
 
 if (config.timeoutMs) {
@@ -1242,7 +1256,8 @@ try {
     const _localVer = readFileSync(_verFile, 'utf8').trim();
     let _uc = null;
     try { if (existsSync(_ucFile)) _uc = JSON.parse(readFileSync(_ucFile, 'utf8')); } catch {}
-    if (_uc && _uc.v && _uc.v !== _localVer) {
+    var _semGt = function(a, b) { var x = a.split('.'), y = b.split('.'); for (var i = 0; i < 3; i++) { var d = (parseInt(x[i]||0)) - (parseInt(y[i]||0)); if (d) return d > 0; } return false; };
+    if (_uc && _uc.v && _semGt(_uc.v, _localVer)) {
       process.stderr.write('[clawgod] v' + _uc.v + ' available (installed: v' + _localVer + ") — run 'claude update' to upgrade\n");
     }
     if (!_uc || Date.now() - (_uc.t || 0) > 86400000) {
@@ -1287,6 +1302,17 @@ const patches = [
     pattern: /function ([\w$]+)\(\)\{return"external"\}/g,
     replacer: (m, fn) => `function ${fn}(){return"ant"}`,
     sentinel: 'return"external"',
+  },
+  {
+    // Bun.isStandaloneExecutable is false under clawgod (plain Bun runtime,
+    // not a compiled standalone binary). fv() guards daemon/fork spawn logic
+    // (DLt), multitool dispatch (RS), and several other codepaths that need
+    // to behave as if running the native binary. The property is frozen on
+    // Bun 1.4+ (configurable:false, writable:false), so runtime monkey-patch
+    // is impossible — patch the source instead. See issue #133.
+    name: 'Bun.isStandaloneExecutable → true',
+    pattern: /function ([\w$]+)\(\)\{return Bun\.isStandaloneExecutable===!0\}/g,
+    replacer: (m, fn) => `function ${fn}(){return!0}`,
   },
   {
     name: 'GrowthBook env overrides',
@@ -1482,6 +1508,31 @@ const patches = [
     name: 'Hex brand color → green',
     pattern: /#da7756/g,
     replacer: () => '#22c55e',
+  },
+  {
+    name: 'Theme claude color → green (ANSI)',
+    pattern: /claude:"ansi:redBright"/g,
+    replacer: () => 'claude:"ansi:greenBright"',
+  },
+  {
+    name: 'Shimmer → green (ANSI)',
+    pattern: /claudeShimmer:"ansi:yellowBright"/g,
+    replacer: () => 'claudeShimmer:"ansi:greenBright"',
+  },
+  {
+    name: 'Brief label claude color → green (RGB dark)',
+    pattern: /briefLabelClaude:"rgb\(215,119,87\)"/g,
+    replacer: () => 'briefLabelClaude:"rgb(34,197,94)"',
+  },
+  {
+    name: 'Brief label claude color → green (RGB light)',
+    pattern: /briefLabelClaude:"rgb\(255,153,51\)"/g,
+    replacer: () => 'briefLabelClaude:"rgb(22,163,74)"',
+  },
+  {
+    name: 'Brief label claude color → green (ANSI)',
+    pattern: /briefLabelClaude:"ansi:redBright"/g,
+    replacer: () => 'briefLabelClaude:"ansi:greenBright"',
   },
 
   // ── macOS Cmd+V 图片粘贴修复 ──

@@ -61,6 +61,34 @@ cat ~/.clawgod/.clawgod-version   # expect 1.6.1-0 or newer fork train
 
 ---
 
+## v1.7.5-0 — merge upstream v1.7.5 (2026-07-24)
+
+**Base:** upstream `v1.7.5` (`507405a`) + fork train. Self-version / tag: `1.7.5-0` / `v1.7.5-0` (source placeholder `0.0.0-dev`; release workflow injects from git tag).
+
+### From upstream v1.7.1–v1.7.5 (prefer upstream)
+
+| Area | Change | Upstream |
+|------|--------|----------|
+| **Update prompt** | Show notice only when remote semver is **newer** (`_semGt`), not on mere inequality | v1.7.5 |
+| **ANSI green theme** | Non-truecolor: `claude` / `claudeShimmer` / `briefLabelClaude` → green ANSI/RGB | v1.7.5 (#137) |
+| **Windows uninstall** | Remove clawgod launcher when no `claude.orig` backup; clean `openai-proxy` + import binary | v1.7.4 |
+| **`fv()` / Bun standalone** | Patch `Bun.isStandaloneExecutable` in source (not runtime monkey-patch); Bun 1.4+ unconfigurable property; compat functional checks | v1.7.3 |
+| **Release version inject** | CI rewrites `CLAWGOD_SELF_VERSION` / `$ClawSelfVersion` from git tag | v1.7.2 |
+| **PSScriptRoot + remote control** | Safe `openai-proxy.cjs` load under `iex`; clear `disableRemoteControl` for third-party `baseURL` | v1.7.1 |
+
+### Fork interest routing kept
+
+| Keep | Detail |
+|------|--------|
+| **Product URLs** | Install / update-check / `claude update` / reinstall / import assets → `karlorz/clawgod` only |
+| **Lean deny lists** | Custom **on** / **max** denylists (EnterPlanMode + Web* on default lean) |
+| **compat-daily** | Auto-open `compat-broken` issues on this repo for any **non-PR** failure (not schedule-only) |
+| **Docs / identity** | Fork changelog, rebranded READMEs/web, no CNAME |
+
+Tag policy: never move upstream `v1.7.5`; ship fork as `v1.7.5-0`.
+
+---
+
 ## v1.7.0-0 — merge upstream v1.7.0 (2026-07-19)
 
 **Base:** upstream `v1.7.0` (`bbf2eca`) + fork train. Self-version / tag: `1.7.0-0` / `v1.7.0-0`.
@@ -146,13 +174,13 @@ claude --lean-on    # or --lean-max / --lean-off
 
 ---
 
-## Upstream baseline retained at v1.7.0
+## Upstream baseline retained at v1.7.5
 
-Everything in upstream through `v1.7.0` is the shared code base (OpenAI-compat proxy, provider import, lean mode machinery, Glob/Grep restore, Cmd+V image paste, 2.1.214 patch fixes, etc.). This file only lists **fork deltas** after that point.
+Everything in upstream through `v1.7.5` is the shared code base (OpenAI-compat proxy, provider import, lean mode, Bun standalone / `fv()` patches, ANSI green theme, update-prompt semver compare, etc.). This file only lists **fork deltas** after that point.
 
 When adding a new fork release:
 
-1. Bump self-version and tag per train (`v1.7.0-N` or next upstream line).
+1. Bump self-version and tag per train (`v1.7.5-N` or next upstream line). Source placeholder stays `0.0.0-dev`; release injects from the tag.
 2. Append a section here with features / major changes / deferred items.
 3. Link the section from [README.md](../README.md) only if user-facing; keep long detail here.
 4. Index new wiki work items from root `CLAUDE.md` using `{WIKI_VAULT}/...` placeholders.

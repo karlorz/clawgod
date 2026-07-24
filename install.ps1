@@ -33,7 +33,8 @@ if ($env:CLAWGOD_LEAN_MAX -eq "1") { $LeanMax = [switch]$true }
 $ClawDir = Join-Path $env:USERPROFILE ".clawgod"
 $BinDir  = Join-Path $env:USERPROFILE ".local\bin"
 # Fork patch train: never retag upstream vX.Y.Z — use vX.Y.Z-0, vX.Y.Z-1, …
-$ClawSelfVersion = "1.7.0-0"
+# Placeholder; release workflow injects the git tag (without leading v).
+$ClawSelfVersion = "0.0.0-dev"
 
 # Product identity — install/self-update must never hit upstream OSS remote.
 # Quoted here-strings cannot expand this; hardcode the same owner/repo in those blobs and keep them in sync.
@@ -60,6 +61,9 @@ if ($Uninstall) {
     if (Test-Path $claudeOrig) {
         Move-Item -Force $claudeOrig $claudeCmd
         Write-OK "Original claude restored"
+    } elseif ((Test-Path $claudeCmd) -and (Select-String -Path $claudeCmd -Pattern "clawgod" -Quiet -ErrorAction SilentlyContinue)) {
+        Remove-Item -Force $claudeCmd
+        Write-OK "Removed ClawGod launcher ($claudeCmd)"
     }
     # Also check for .exe backup
     $claudeExeOrig = Join-Path $BinDir "claude.orig.exe"
@@ -75,7 +79,7 @@ if ($Uninstall) {
         Write-OK "Removed clawgod alias"
     }
 
-    foreach ($f in @("cli.js","cli.cjs","cli.original.js","cli.original.cjs","cli.original.js.bak","cli.original.cjs.bak","patch.js","patch.mjs","extract-natives.mjs","post-process.mjs","repatch.mjs",".source-version","node_modules","bun-runtime","vendor")) {
+    foreach ($f in @("cli.js","cli.cjs","cli.original.js","cli.original.cjs","cli.original.js.bak","cli.original.cjs.bak","patch.js","patch.mjs","extract-natives.mjs","post-process.mjs","repatch.mjs","openai-proxy.cjs","clawgod-import.exe",".source-version","node_modules","bun-runtime","vendor")) {
         $p = Join-Path $ClawDir $f
         if (Test-Path $p) { Remove-Item -Recurse -Force $p }
     }
@@ -905,7 +909,9 @@ Write-OK "Re-patch helper installed (repatch.mjs)"
 
 # NOTE: PowerShell here-string @'...'@ cannot contain a line starting with '@
 # The proxy source is identical to the install.sh version.
-$ProxySource = Get-Content (Join-Path $PSScriptRoot "openai-proxy.cjs") -Raw -ErrorAction SilentlyContinue
+# $PSScriptRoot is empty when run via iex (e.g. claude update → iex(irm $url)).
+# Join-Path "" "file" throws a terminating error that -ErrorAction cannot catch.
+try { $ProxySource = Get-Content (Join-Path $PSScriptRoot "openai-proxy.cjs") -Raw -ErrorAction Stop } catch { $ProxySource = $null }
 if (-not $ProxySource) {
   # Inline fallback: fetch from release assets
   $ProxySource = @'
@@ -1262,6 +1268,16 @@ if (hasProviderApiKey) {
 // Users can force re-enable with CLAUDE_CODE_ATTRIBUTION_HEADER=1 if needed.
 if (config.baseURL && !/anthropic\.com/i.test(config.baseURL)) {
   process.env.CLAUDE_CODE_ATTRIBUTION_HEADER ??= '0';
+  try {
+    const _rcSettings = join(homedir(), '.claude', 'settings.json');
+    if (existsSync(_rcSettings)) {
+      const _rcS = JSON.parse(readFileSync(_rcSettings, 'utf8'));
+      if (_rcS.disableRemoteControl) {
+        delete _rcS.disableRemoteControl;
+        writeFileSync(_rcSettings, JSON.stringify(_rcS, null, 2) + '\n');
+      }
+    }
+  } catch {}
 }
 
 if (config.timeoutMs) {
@@ -1356,7 +1372,8 @@ try {
     const _localVer = readFileSync(_verFile, 'utf8').trim();
     let _uc = null;
     try { if (existsSync(_ucFile)) _uc = JSON.parse(readFileSync(_ucFile, 'utf8')); } catch {}
-    if (_uc && _uc.v && _uc.v !== _localVer) {
+    var _semGt = function(a, b) { var x = a.split('.'), y = b.split('.'); for (var i = 0; i < 3; i++) { var d = (parseInt(x[i]||0)) - (parseInt(y[i]||0)); if (d) return d > 0; } return false; };
+    if (_uc && _uc.v && _semGt(_uc.v, _localVer)) {
       process.stderr.write('[clawgod] v' + _uc.v + ' available (installed: v' + _localVer + ") — run 'claude update' to upgrade\n");
     }
     if (!_uc || Date.now() - (_uc.t || 0) > 86400000) {
@@ -1399,6 +1416,11 @@ const patches = [
     pattern: /function ([\w$]+)\(\)\{return"external"\}/g,
     replacer: (m, fn) => `function ${fn}(){return"ant"}`,
     sentinel: 'return"external"',
+  },
+  {
+    name: 'Bun.isStandaloneExecutable → true',
+    pattern: /function ([\w$]+)\(\)\{return Bun\.isStandaloneExecutable===!0\}/g,
+    replacer: (m, fn) => `function ${fn}(){return!0}`,
   },
   {
     name: 'GrowthBook env overrides',
@@ -1570,6 +1592,31 @@ const patches = [
     name: 'Hex brand color → green',
     pattern: /#da7756/g,
     replacer: () => '#22c55e',
+  },
+  {
+    name: 'Theme claude color → green (ANSI)',
+    pattern: /claude:"ansi:redBright"/g,
+    replacer: () => 'claude:"ansi:greenBright"',
+  },
+  {
+    name: 'Shimmer → green (ANSI)',
+    pattern: /claudeShimmer:"ansi:yellowBright"/g,
+    replacer: () => 'claudeShimmer:"ansi:greenBright"',
+  },
+  {
+    name: 'Brief label claude color → green (RGB dark)',
+    pattern: /briefLabelClaude:"rgb\(215,119,87\)"/g,
+    replacer: () => 'briefLabelClaude:"rgb(34,197,94)"',
+  },
+  {
+    name: 'Brief label claude color → green (RGB light)',
+    pattern: /briefLabelClaude:"rgb\(255,153,51\)"/g,
+    replacer: () => 'briefLabelClaude:"rgb(22,163,74)"',
+  },
+  {
+    name: 'Brief label claude color → green (ANSI)',
+    pattern: /briefLabelClaude:"ansi:redBright"/g,
+    replacer: () => 'briefLabelClaude:"ansi:greenBright"',
   },
   {
     name: 'macOS Cmd+V image paste fallback to clipboard read',
