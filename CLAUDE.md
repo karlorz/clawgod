@@ -16,3 +16,4 @@
 | `{WIKI_VAULT}/projects/clawgod/work/2026-07-18-fork-isolation/plan.md` | Implementation plan |
 | `{WIKI_VAULT}/projects/clawgod/work/2026-07-18-fork-isolation/log.md` | Work log |
 | `{WIKI_VAULT}/queries/2026-07-18-clawgod-lean-mode-flags-tools.md` | Lean on/max flags & denied tools (research) |
+| `{WIKI_VAULT}/queries/2026-07-24-clawgod-v175-upstream-sync-p1-p2.md` | Upstream v1.7.5 merge, security, import CI, 2.1.218 patches |
