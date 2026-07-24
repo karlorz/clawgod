@@ -84,6 +84,31 @@ cat ~/.clawgod/.clawgod-version   # expect 1.6.1-0 or newer fork train
 | **baseURL host match** | Hostname parse (`api.anthropic.com` / `*.anthropic.com`) instead of `/anthropic.com/` substring |
 | **Release tag allowlist** | Inject step rejects tags outside `N.N.N` / fork-train (`1.7.5-0`); uses `|` sed delimiters |
 
+---
+
+## v1.7.5-1 — import CI + Claude 2.1.218 patch track (2026-07-24)
+
+**Base:** fork `v1.7.5-0`. Self-version / tag: `1.7.5-1` / `v1.7.5-1`.
+
+### P1 — import CI (`build-import.yml`)
+
+| Area | Change |
+|------|--------|
+| **darwin-x64 runner** | `macos-13` → **`macos-15-intel`** (macos-13 retired Dec 2025; jobs queued forever / never attached import assets) |
+
+Evidence: GitHub changelog 2025-09-19; docs list `macos-15-intel` / `macos-26-intel` as current Intel labels.
+
+### P2 — Claude Code **2.1.218** patch track (local `cli.original.cjs`)
+
+| Patch | 2.1.218 change | Fix |
+|-------|----------------|-----|
+| **GrowthBook env** | `hWr()` early-returns before reading `CLAUDE_INTERNAL_FC_OVERRIDES` (dead code) | New pattern rewrites dead return so `features.json` env injection works |
+| **Agent Teams** | `Z.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` object form (not `helper(process.env.…)`) | New env-object matcher; legacy helper form kept optional |
+| **Voice Mode** | `allow_voice_mode` + mic chain (`rNo`/`Cgr`); `tengu_amber_quartz_disabled` gone | New chain matcher; old quartz kill optional |
+| **Computer Use gate** | `X()&&Y().enabled` form absent; **subscription + default enabled still apply** | Gate patch optional; CU still unlocked via other patches |
+
+Legacy patterns remain `optional: true` so older Claude versions keep working.
+
 ### Fork interest routing kept
 
 | Keep | Detail |

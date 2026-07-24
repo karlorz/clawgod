@@ -1333,11 +1333,22 @@ const patches = [
     replacer: (m, fn) => `function ${fn}(){return!0}`,
   },
   {
-    name: 'GrowthBook env overrides',
+    // ≤~2.1.21x: lazy init `if(!flag)flag=!0;return val` then inject env parse.
+    name: 'GrowthBook env overrides (legacy init)',
     pattern: /function ([\w$]+)\(\)\{if\(!([\w$]+)\)\2=!0;return ([\w$]+)\}/g,
     replacer: (m, fn, flag, val) =>
       `function ${fn}(){if(!${flag}){${flag}=!0;try{let e=process.env.CLAUDE_INTERNAL_FC_OVERRIDES;if(e)${val}=JSON.parse(e)}catch(e){}}return ${val}}`,
-    unique: true,  // must match exactly 1
+    optional: true,
+  },
+  {
+    // v2.1.218+: hWr-style dead early-return makes CLAUDE_INTERNAL_FC_OVERRIDES
+    // unreachable (`return flag=!0,val; let e=process.env...` never runs).
+    // Rewrite to apply env overrides so features.json injection works.
+    name: 'GrowthBook env overrides (dead-return fix, 2.1.218+)',
+    pattern: /function ([\w$]+)\(\)\{if\(([\w$]+)\)return ([\w$]+);return \2=!0,\3;let ([\w$]+)=process\.env\.CLAUDE_INTERNAL_FC_OVERRIDES;if\(!\4\)return \3;try\{\3=([\w$]+)\(\4\),[\w$]+\(`GrowthBook: Using env var overrides for \$\{Object\.keys\(\3\)\.length\} features: \$\{Object\.keys\(\3\)\.join\(", "\)\}`\)\}catch\{[\w$]+\(`GrowthBook: Failed to parse CLAUDE_INTERNAL_FC_OVERRIDES: \$\{\4\}`,\{level:"error"\}\)\}return \3\}/g,
+    replacer: (m, fn, flag, val, evar, parse) =>
+      `function ${fn}(){if(${flag})return ${val};${flag}=!0;let ${evar}=process.env.CLAUDE_INTERNAL_FC_OVERRIDES;if(${evar}){try{${val}=${parse}(${evar})}catch{}}return ${val}}`,
+    optional: true,
   },
   {
     name: 'GrowthBook config overrides',
@@ -1352,9 +1363,18 @@ const patches = [
     },
   },
   {
-    name: 'Agent Teams always enabled',
+    // Older: helper(process.env.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS)
+    name: 'Agent Teams always enabled (env helper form)',
     pattern: /function ([\w$]+)\(\)\{if\(![\w$]+\(process\.env\.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS\)&&![\w$]+\(\)\)return!1;if\(![\w$]+\("tengu_amber_flint",!0\)\)return!1;return!0\}/g,
     replacer: (m, fn) => `function ${fn}(){return!0}`,
+    optional: true,
+  },
+  {
+    // v2.1.218+: env object form — if(!Z.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS&&!wC_())...
+    name: 'Agent Teams always enabled (env object form, 2.1.218+)',
+    pattern: /function ([\w$]+)\(\)\{if\(![\w$]+\.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS&&![\w$]+\(\)\)return!1;if\(![\w$]+\("tengu_amber_flint",!0\)\)return!1;return!0\}/g,
+    replacer: (m, fn) => `function ${fn}(){return!0}`,
+    optional: true,
   },
   {
     name: 'Computer Use subscription bypass',
@@ -1402,14 +1422,26 @@ const patches = [
     optional: true,
   },
   {
+    // Pre-2.1.218 form; on 2.1.218+ covered by "Computer Use default enabled".
     name: 'Computer Use gate bypass',
     pattern: /function ([\w$]+)\(\)\{return [\w$]+\(\)&&[\w$]+\(\)\.enabled\}/g,
     replacer: (m, fn) => `function ${fn}(){return!0}`,
+    optional: true,
   },
   {
+    // Older GrowthBook kill-switch for voice.
     name: 'Voice Mode enable (bypass GrowthBook kill)',
     pattern: /function ([\w$]+)\(\)\{return![\w$]+\("tengu_amber_quartz_disabled",!1\)\}/g,
     replacer: (m, fn) => `function ${fn}(){return!0}`,
+    optional: true,
+  },
+  {
+    // v2.1.218+: voice gated via allow_voice_mode + mic probe chain
+    //   function rNo(){return is("allow_voice_mode")}function Cgr(){return tNo()&&rNo()}
+    name: 'Voice Mode enable (allow_voice_mode chain, 2.1.218+)',
+    pattern: /function ([\w$]+)\(\)\{return is\("allow_voice_mode"\)\}function ([\w$]+)\(\)\{return ([\w$]+)\(\)&&\1\(\)\}/g,
+    replacer: (m, rNo, Cgr) => `function ${rNo}(){return!0}function ${Cgr}(){return!0}`,
+    optional: true,
   },
   {
     // v2.1.158+: provider gate refactored into helper function:
