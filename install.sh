@@ -1328,8 +1328,13 @@ const patches = [
     // to behave as if running the native binary. The property is frozen on
     // Bun 1.4+ (configurable:false, writable:false), so runtime monkey-patch
     // is impossible — patch the source instead. See issue #133.
+    //
+    // v2.1.236+ wraps the guard in a typeof-Bun check:
+    //   function fv(){return Bun.isStandaloneExecutable===!0}        ≤v2.1.235
+    //   function kw(){return typeof Bun<"u"&&Bun.isStandaloneExecutable===!0}  v2.1.236+
+    // Match both via an optional `typeof Bun<"u"&&` prefix.
     name: 'Bun.isStandaloneExecutable → true',
-    pattern: /function ([\w$]+)\(\)\{return Bun\.isStandaloneExecutable===!0\}/g,
+    pattern: /function ([\w$]+)\(\)\{return (?:typeof Bun<"u"&&)?Bun\.isStandaloneExecutable===!0\}/g,
     replacer: (m, fn) => `function ${fn}(){return!0}`,
   },
   {
@@ -1486,8 +1491,16 @@ const patches = [
     // latest install.sh from the release so users get patcher fixes too.
     // Escape hatch printed on every run: `install.sh --uninstall` restores
     // claude.orig and lets vanilla `claude update` work again.
+    //
+    // v2.1.232+ wraps the action handler in a framework helper. The helper
+    // is a minified identifier whose name drifts across builds:
+    //   .action(async()=>{…})              ≤v2.1.231
+    //   .action(t(async(a)=>{…}))          v2.1.232 … v2.1.237
+    //   .action(n(async(u)=>{…}))          v2.1.238+
+    // Match any one-letter minified helper via `identifier(` rather than
+    // hardcoding a name, so a future rename keeps matching.
     name: "Redirect `claude update` to clawgod self-update",
-    pattern: /(\.command\("update"\)\.alias\("upgrade"\)\.description\("[^"]+"\))(\.action\(async\(\)=>\{)/g,
+    pattern: /(\.command\("update"\)\.alias\("upgrade"\)\.description\("[^"]+"\))(\.action\((?:[A-Za-z_$][\w$]*\()?async\([^)]*\)=>\{)/g,
     replacer: (m, chain, action) => {
       // PowerShell 5.1's Invoke-WebRequest ignores HTTP_PROXY/HTTPS_PROXY env
       // (only reads IE system proxy). Read env explicitly and pass via -Proxy
@@ -2134,6 +2147,7 @@ if [ ! -x \"\$BUN_BIN\" ]; then
   exit 127
 fi
 export CLAUDE_CODE_EXECPATH=\"$CLAUDE_BIN.orig\"
+export HERDR_AGENT=\"\${HERDR_AGENT:-claude}\"
 exec \"\$BUN_BIN\" \"\$CLAWGOD_CLI\" \"\$@\""
 
 

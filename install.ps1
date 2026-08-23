@@ -1440,7 +1440,11 @@ const patches = [
   },
   {
     name: 'Bun.isStandaloneExecutable → true',
-    pattern: /function ([\w$]+)\(\)\{return Bun\.isStandaloneExecutable===!0\}/g,
+    // v2.1.236+ wraps the guard in a typeof-Bun check:
+    //   function fv(){return Bun.isStandaloneExecutable===!0}                          <=v2.1.235
+    //   function kw(){return typeof Bun<"u"&&Bun.isStandaloneExecutable===!0}        v2.1.236+
+    // Match both via an optional `typeof Bun<"u"&&` prefix.
+    pattern: /function ([\w$]+)\(\)\{return (?:typeof Bun<"u"&&)?Bun\.isStandaloneExecutable===!0\}/g,
     replacer: (m, fn) => `function ${fn}(){return!0}`,
   },
   {
@@ -1601,8 +1605,16 @@ const patches = [
     // version is re-extracted, re-patched, and re-launchered without ever
     // touching the bun runtime. Escape hatch for users who want vanilla
     // update is printed every run.
+    //
+    // v2.1.232+ wraps the action handler in a framework helper. The helper
+    // is a minified identifier whose name drifts across builds:
+    //   .action(async()=>{…})              ≤v2.1.231
+    //   .action(t(async(a)=>{…}))          v2.1.232 … v2.1.237
+    //   .action(n(async(u)=>{…}))          v2.1.238+
+    // Match any one-letter minified helper via `identifier(` rather than
+    // hardcoding a name, so a future rename keeps matching.
     name: "Redirect `claude update` to clawgod self-update",
-    pattern: /(\.command\("update"\)\.alias\("upgrade"\)\.description\("[^"]+"\))(\.action\(async\(\)=>\{)/g,
+    pattern: /(\.command\("update"\)\.alias\("upgrade"\)\.description\("[^"]+"\))(\.action\((?:[A-Za-z_$][\w$]*\()?async\([^)]*\)=>\{)/g,
     replacer: (m, chain, action) => {
       // PowerShell 5.1's Invoke-WebRequest ignores HTTP_PROXY/HTTPS_PROXY env
       // (only reads IE system proxy). Read env explicitly and pass via -Proxy
