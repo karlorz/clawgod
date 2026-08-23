@@ -12,6 +12,8 @@
 | [README.md](README.md) | User-facing install / features |
 | `{WIKI_VAULT}/projects/clawgod/README.md` | Wiki project workspace |
 | `{WIKI_VAULT}/projects/clawgod/knowledge.md` | Wiki project knowledge index |
+| `{WIKI_VAULT}/projects/clawgod/architecture/00-reimplementation-blueprint.md` | Architecture reimplementation blueprint |
+| `{WIKI_VAULT}/projects/clawgod/architecture/01-topology.md` | Architecture topology & C4 containers |
 | `{WIKI_VAULT}/projects/clawgod/work/2026-07-18-fork-isolation/spec.md` | Fork isolation design |
 | `{WIKI_VAULT}/projects/clawgod/work/2026-07-18-fork-isolation/plan.md` | Implementation plan |
 | `{WIKI_VAULT}/projects/clawgod/work/2026-07-18-fork-isolation/log.md` | Work log |
