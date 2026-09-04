@@ -119,6 +119,37 @@ claude.orig         # Original unpatched version (auto-backed-up)
 - **OpenAI-compat providers** → set `"type": "grok"` or `"type": "openai-compat"` (plus `apiKey` / `baseURL` / `model` as needed). ClawGod starts a local Anthropic↔OpenAI translation proxy so Claude Code can talk to xAI/Grok and other Chat Completions APIs.
 - **One-shot import** → `claude import grok` or `claude import openai-compat` (after install ships `clawgod-import` from this fork’s releases).
 
+### Feature Toggles
+
+`~/.clawgod/patches.json` (auto-created empty) switches features off persistently — your choices survive updates and reinstalls. Absent key = on.
+
+```json
+{ "theme": false, "geo-neutralize": false }
+```
+
+| Feature id | Controls |
+|------------|----------|
+| `agent-teams` | Agent Teams always enabled |
+| `computer-use` | Computer Use unlock |
+| `ultraplan` | Ultraplan slash command |
+| `ultrareview` | Ultrareview slash command |
+| `voice-mode` | Voice Mode |
+| `auto-mode` | Auto-mode model selection on third-party APIs |
+| `theme` | Green brand/logo color scheme |
+| `geo-neutralize` | Geo/proxy steganography neutralization in system prompt |
+| `cyber-risk` | Removes CYBER_RISK_INSTRUCTION from system prompt |
+| `url-restriction` | Removes URL generation restriction from system prompt |
+| `cautious-actions` | Removes "Executing actions with care" section from system prompt |
+| `not-logged-in` | Removes "Not logged in" notice |
+| `message-filter` | Bypasses non-ant message/attachment filters |
+
+For a single launch, set an env var instead — feature id upper-cased, dashes to underscores:
+
+```bash
+CLAWGOD_FEATURE_THEME=false claude     # green theme off, this run only
+CLAWGOD_FEATURE_GEO_NEUTRALIZE=true claude  # temporarily re-enable one disabled in patches.json
+```
+
 ## How it works
 
 Since `@anthropic-ai/claude-code` v2.1.113, the npm package no longer ships `cli.js` — it's a thin loader that dispatches to platform-specific Bun standalone binaries. ClawGod adapts:
