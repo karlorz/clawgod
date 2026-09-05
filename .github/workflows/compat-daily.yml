@@ -1,6 +1,6 @@
 name: Compat Daily
 
-# Runs the Linux and Windows installers end-to-end against the current latest
+# Runs the Linux, macOS, and Windows installers end-to-end against the current latest
 # Claude Code from npm. Catches upstream compatibility changes as well as
 # platform-specific extraction, path-rewriting, and launcher regressions.
 
@@ -28,49 +28,65 @@ permissions:
   contents: write   # write needed to push the version-badge JSON to `badges` branch
   issues: write
 
-# Opt every JS-based action (e.g. actions/checkout, actions/cache,
-# actions/github-script) onto Node 24, ahead of GitHub forcing it on
-# 2026-06-02. Silences the deprecation warning and keeps us aligned
-# with the Node version we use to run patch.mjs / extract-natives.mjs.
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
-
+# JavaScript actions use native Node.js 24 releases.
 jobs:
   build-sources:
     name: Generated installers are current
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Set up Node.js 24
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 24
+          package-manager-cache: false
 
       - name: Verify generated installers
         run: node build.js --check
+
+      - name: Run patch semantic tests
+        run: node src/shared/patch.test.mjs
 
       - name: Check embedded JavaScript syntax
         shell: bash
         run: |
           set -euo pipefail
-          for file in src/shared/*.mjs src/shared/*.cjs src/unix/*.cjs src/windows/*.mjs src/windows/*.cjs; do
+          for file in src/shared/*.mjs src/shared/*.cjs src/windows/*.mjs src/windows/*.cjs; do
             node --check "$file"
           done
 
   smoke:
-    # Linux remains the badge-publishing compatibility baseline. Windows has a
-    # separate job below because its PE extraction and path semantics differ.
-    runs-on: ubuntu-latest
+    # Share Unix installer checks across Linux x64 and macOS ARM64. Linux
+    # remains the badge-publishing baseline; Windows uses a separate job below.
+    name: ${{ matrix.name }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux smoke (x64)
+            os: ubuntu-latest
+            platform: linux
+            arch: x86_64
+          - name: macOS smoke (ARM64)
+            os: macos-26
+            platform: macos
+            arch: arm64
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 20
+    env:
+      SMOKE_PLATFORM: ${{ matrix.platform }}
+      SMOKE_RUNNER: ${{ matrix.os }}
+      EXPECTED_ARCH: ${{ matrix.arch }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Set up Node.js 24
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 24
+          package-manager-cache: false
 
       - name: Set up Bun (canary)
         # Anthropic ships claude-code with bleeding-edge Bun (e.g. 1.3.14
@@ -84,22 +100,32 @@ jobs:
           bun-version: canary
 
       - name: Cache ~/.npm (claude-code-<plat> tarball)
-        # install.sh runs `npm pack @anthropic-ai/claude-code-linux-x64@latest`,
+        # install.sh runs `npm pack` for the detected OS and architecture,
         # which lands the ~80 MB tarball in ~/.npm/_cacache. Reusing the cache
         # lets npm short-circuit the download when @latest hasn't bumped since
         # the last run; it still re-validates registry metadata, so we never
         # serve a stale binary on a real upgrade day.
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.npm
-          key: npm-claude-${{ runner.os }}-${{ github.run_id }}
+          key: npm-claude-${{ runner.os }}-${{ runner.arch }}-${{ github.run_id }}
           restore-keys: |
-            npm-claude-${{ runner.os }}-
+            npm-claude-${{ runner.os }}-${{ runner.arch }}-
 
-      - name: Install ripgrep
+      - name: Install ripgrep (Linux)
+        if: runner.os == 'Linux'
         shell: bash
         run: |
           sudo apt-get update -qq && sudo apt-get install -y ripgrep
+          rg --version | head -1
+
+      - name: Install ripgrep (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          if ! command -v rg >/dev/null 2>&1; then
+            brew install ripgrep
+          fi
           rg --version | head -1
 
       - name: Add ~/.local/bin to PATH (clawgod launcher install target)
@@ -112,6 +138,10 @@ jobs:
           bun --version
           node --version
           uname -a
+          [[ "$(uname -m)" == "$EXPECTED_ARCH" ]] || { echo "::error::unexpected runner architecture"; exit 1; }
+          if [[ "$RUNNER_OS" == "macOS" ]]; then
+            sw_vers
+          fi
 
       - name: Run install.sh (npm-fallback path)
         # No official Claude binary pre-installed → install.sh exercises
@@ -129,7 +159,7 @@ jobs:
         shell: bash
         run: |
           ls -la "$HOME/.clawgod/" || true
-          for f in cli.cjs cli.original.cjs patch.mjs extract-natives.mjs post-process.mjs .source-version; do
+          for f in cli.cjs cli.original.cjs patch.mjs extract-natives.mjs post-process.mjs feature-gates.cjs runtime-helpers.cjs .source-version; do
             test -e "$HOME/.clawgod/$f" || { echo "::error::missing ~/.clawgod/$f"; exit 1; }
           done
           echo "Source: $(cat "$HOME/.clawgod/.source-version")"
@@ -258,7 +288,7 @@ jobs:
         # `badges` branch (force-pushed; that branch holds nothing else and is
         # never read as source). README links to it via shields.io endpoint.
         # PRs from forks can't push, so skip them.
-        if: success() && github.event_name != 'pull_request'
+        if: success() && matrix.platform == 'linux' && github.event_name != 'pull_request'
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -289,7 +319,7 @@ jobs:
       # Open/update on this repository for any non-PR failure.
       - name: Open / update issue on failure
         if: failure() && github.event_name != 'pull_request'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const fs = require('fs');
@@ -300,7 +330,10 @@ jobs:
             const claudeVersion = fs.existsSync(stamp)
               ? fs.readFileSync(stamp, 'utf8').trim()
               : 'unknown';
-            const title = `compat-daily: broke (claude ${claudeVersion})`;
+            const prefix = process.env.SMOKE_PLATFORM === 'linux'
+              ? 'compat-daily'
+              : `compat-daily/${process.env.SMOKE_PLATFORM}`;
+            const title = `${prefix}: broke (claude ${claudeVersion})`;
             const runUrl = `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`;
             const event = context.eventName;
 
@@ -332,7 +365,7 @@ jobs:
                 owner, repo, title,
                 labels: ['compat-broken', 'bug'],
                 body: [
-                  `Compatibility run failed on \`ubuntu-latest\`.`,
+                  `Daily compatibility run failed on \`${process.env.SMOKE_RUNNER}\`.`,
                   ``,
                   `- Claude binary: \`${claudeVersion}\``,
                   `- Event: \`${event}\``,
@@ -351,12 +384,13 @@ jobs:
     env:
       NPM_CONFIG_CACHE: ${{ github.workspace }}\.npm-cache
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Set up Node.js 24
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 24
+          package-manager-cache: false
 
       - name: Set up Bun (canary)
         uses: oven-sh/setup-bun@v2
@@ -364,7 +398,7 @@ jobs:
           bun-version: canary
 
       - name: Cache npm downloads
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ${{ github.workspace }}\.npm-cache
           key: npm-claude-${{ runner.os }}-${{ github.run_id }}
@@ -441,6 +475,8 @@ jobs:
             'patch.mjs',
             'extract-natives.mjs',
             'post-process.mjs',
+            'feature-gates.cjs',
+            'runtime-helpers.cjs',
             '.source-version'
           )
           foreach ($name in $required) {
@@ -494,7 +530,7 @@ jobs:
 
       - name: Open or update issue on scheduled failure
         if: failure() && github.event_name == 'schedule'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const fs = require('fs');
