@@ -44,7 +44,7 @@ const FEATURES = {
   'ultrareview':    { desc: 'Ultrareview slash command',
                       patchIds: ['ultrareview-gate', 'ultrareview-direct'] },
   'voice-mode':     { desc: 'Voice Mode',
-                      patchIds: ['voice-mode'] },
+                      patchIds: ['voice-mode', 'voice-mode-allow-chain'] },
   'auto-mode':      { desc: 'Auto-mode model selection on third-party APIs',
                       patchIds: ['auto-mode-helper-gate', 'auto-mode-inline-gate'] },
   'theme':          { desc: 'Green brand/logo color scheme',
@@ -112,6 +112,7 @@ const patches = [
     // v2.1.218+: hWr-style dead early-return makes CLAUDE_INTERNAL_FC_OVERRIDES
     // unreachable (`return flag=!0,val; let e=process.env...` never runs).
     // Rewrite to apply env overrides so features.json injection works.
+    id: 'growthbook-env-overrides-dead-return',
     name: 'GrowthBook env overrides (dead-return fix, 2.1.218+)',
     pattern: /function ([\w$]+)\(\)\{if\(([\w$]+)\)return ([\w$]+);return \2=!0,\3;let ([\w$]+)=process\.env\.CLAUDE_INTERNAL_FC_OVERRIDES;if\(!\4\)return \3;try\{\3=([\w$]+)\(\4\),[\w$]+\(`GrowthBook: Using env var overrides for \$\{Object\.keys\(\3\)\.length\} features: \$\{Object\.keys\(\3\)\.join\(", "\)\}`\)\}catch\{[\w$]+\(`GrowthBook: Failed to parse CLAUDE_INTERNAL_FC_OVERRIDES: \$\{\4\}`,\{level:"error"\}\)\}return \3\}/g,
     replacer: (m, fn, flag, val, evar, parse) =>
@@ -149,11 +150,11 @@ const patches = [
     },
   },
   {
-    // Older: helper(process.env.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS)
+    id: 'agent-teams',
+    toggleable: true,
     name: 'Agent Teams always enabled',
     pattern: /function ([\w$]+)\(\)\{if\(![\w$]+\(process\.env\.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS\)&&![\w$]+\(\)\)return!1;if\(![\w$]+\("tengu_amber_flint",!0\)\)return!1;return!0\}/g,
-    replacer: (m, fn) => `function ${fn}(){return!0}`,
-    optional: true,
+    replacer: (m, fn) => `function ${fn}(){if(${gate('agent-teams')})return!0;` + m.slice(`function ${fn}(){`.length, -1) + `}`,
   },
   {
     // v2.1.245+ Agent Teams gate became an exported module in its own chunk
@@ -225,25 +226,27 @@ const patches = [
     optional: true,
   },
   {
-    // Pre-2.1.218 form; on 2.1.218+ covered by "Computer Use default enabled".
+    id: 'computer-use-gate',
+    toggleable: true,
     name: 'Computer Use gate bypass',
     pattern: /function ([\w$]+)\(\)\{return [\w$]+\(\)&&[\w$]+\(\)\.enabled\}/g,
-    replacer: (m, fn) => `function ${fn}(){return!0}`,
-    optional: true,
+    replacer: (m, fn) => `function ${fn}(){return ${gate('computer-use-gate')}?!0:(${m.slice(`function ${fn}(){return `.length, -1)})}`,
   },
   {
-    // Older GrowthBook kill-switch for voice.
+    id: 'voice-mode',
+    toggleable: true,
     name: 'Voice Mode enable (bypass GrowthBook kill)',
     pattern: /function ([\w$]+)\(\)\{return![\w$]+\("tengu_amber_quartz_disabled",!1\)\}/g,
-    replacer: (m, fn) => `function ${fn}(){return!0}`,
-    optional: true,
+    replacer: (m, fn) => `function ${fn}(){return ${gate('voice-mode')}?!0:(${m.slice(`function ${fn}(){return`.length, -1)})}`,
   },
   {
     // v2.1.218+: voice gated via allow_voice_mode + mic probe chain
     //   function rNo(){return is("allow_voice_mode")}function Cgr(){return tNo()&&rNo()}
+    id: 'voice-mode-allow-chain',
+    toggleable: true,
     name: 'Voice Mode enable (allow_voice_mode chain, 2.1.218+)',
     pattern: /function ([\w$]+)\(\)\{return is\("allow_voice_mode"\)\}function ([\w$]+)\(\)\{return ([\w$]+)\(\)&&\1\(\)\}/g,
-    replacer: (m, rNo, Cgr) => `function ${rNo}(){return!0}function ${Cgr}(){return!0}`,
+    replacer: (m, rNo, Cgr, tNo) => `function ${rNo}(){return ${gate('voice-mode-allow-chain')}?!0:is("allow_voice_mode")}function ${Cgr}(){return ${gate('voice-mode-allow-chain')}?!0:(${tNo}()&&${rNo}())}`,
     optional: true,
   },
   {
