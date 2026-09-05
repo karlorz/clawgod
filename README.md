@@ -262,7 +262,7 @@ After that one-time reinstall, `claude update` is safe on this machine (still Cl
 grep -E 'karlorz/clawgod|0Chencc' ~/.clawgod/cli.cjs | head
 # expect karlorz only
 cat ~/.clawgod/.clawgod-version
-# expect 1.6.1-0 (or newer fork train)
+# expect 1.9.3-0 (or newer fork train)
 ```
 
 ## Fork release & CI policy
@@ -278,8 +278,6 @@ cat ~/.clawgod/.clawgod-version
 Release workflow trigger remains `v*` (same as [upstream `release.yml`](https://github.com/0Chencc/clawgod/blob/main/.github/workflows/release.yml)). Install notes use `${{ github.repository }}` → **this** fork only.
 
 **CI parity:** Workflow YAML for `release.yml`, `compat-daily.yml`, and `cache-cleanup-weekly.yml` matches upstream logic; all repo-scoped actions use `github.repository` / `GITHUB_REPOSITORY` (this fork), not `0Chencc/clawgod`.
-
-**Expected compat-daily failure (today):** Upstream broke on Claude Code **2.1.214** (two stale patches: Ultrareview + third-party auto-mode). This fork has **not** fixed those regexes yet, so `compat-daily` on current `@latest` Claude is **expected to fail** the “Assert all patches applied” step (`failed > 0`) — same class of failure as upstream issue #126. Do not treat that red X as a fork-isolation regression until the 2.1.214 patch work lands.
 
 ## License
 

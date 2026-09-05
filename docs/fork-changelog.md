@@ -10,6 +10,61 @@ Upstream product URL / domain must not reappear in installers or self-update pat
 
 ---
 
+## v1.9.3-0 — merge upstream v1.9.3 (2026-09-05)
+
+**Base:** upstream `v1.9.3` + fork train. Self-version / tag: `1.9.3-0` / `v1.9.3-0`. Release published 2026-09-05 ~15:46Z. Compare: `v1.7.5-2...v1.9.3-0`.
+
+### From upstream (prefer upstream)
+
+| Area | Change |
+|------|--------|
+| **Claude ESM / Windows chunks** | Support v2.1.245+ ESM chunk-graph layout; preserve Windows `B:/~BUN/root` chunk paths; tolerate successful Windows stderr in CI |
+| **Installer build** | Reproducible build sources; shared `cli.cjs` cleanup / dedupe into `src/shared/cli.cjs` |
+| **Windows install** | Support `irm \| iex` pipe execution (BOM / package-path fixes) |
+| **CI** | Native Node.js 24 actions; macOS 26 ARM64 daily compatibility checks |
+| **Patches** | Feature registry + `CLAWGOD_FEATURE_*` / `patches.json` toggles; auto-mode classifier tuning; classifier timeout floor helper + tests |
+
+### Fork interest routing kept
+
+| Keep | Detail |
+|------|--------|
+| **Product URLs** | Install / update-check / `claude update` / reinstall / import assets → `karlorz/clawgod` only |
+| **Sync SoT** | `upstream-sync-pr.yml` (Actions) + preserve isolation on conflict merges (`#17`, `#18`, `#20`) |
+| **compat-daily** | Green on the v1.9.3 merge line; do not treat historical 2.1.214 “expected red” notes as current |
+| **Docs / identity** | Fork changelog, rebranded READMEs/web, no CNAME |
+
+Tag policy: never move upstream `v1.9.3`; ship fork as `v1.9.3-0`.
+
+### Verify after install
+
+```bash
+grep -E 'karlorz/clawgod|0Chencc' ~/.clawgod/cli.cjs | head
+# expect karlorz only
+cat ~/.clawgod/.clawgod-version
+# expect 1.9.3-0 (or newer fork train)
+```
+
+---
+
+## v1.7.5-2 — README-only guard + Claude 2.1.227–238 patches (2026-08-23)
+
+**Base:** fork `v1.7.5-1`. Self-version / tag: `1.7.5-2` / `v1.7.5-2`. Compare: `v1.7.5-1...v1.7.5-2`.
+
+### Major changes
+
+| Area | Change |
+|------|--------|
+| **CI** | Reject README-only PRs (`reject-readme-only.yml`) — PRs that only touch `README.md` / `README_JP.md` / `README_ZH.md` fail |
+| **Patches** | Match `claude update` action wrapper for v2.1.227+; Bun.isStandaloneExecutable guard for v2.1.236+; minified action helper rename for v2.1.238 |
+| **Herdr** | Expose Claude identity to Herdr agent detection |
+| **Docs** | Index architecture references; compat issues referenced for auto-close |
+
+### Fork interest routing kept
+
+Product URLs, lean deny lists, compat-daily auto-issue, and fork identity docs remain on `karlorz/clawgod` only.
+
+---
+
 ## v1.6.1-0 — Fork isolation (2026-07-18)
 
 **Base:** upstream `v1.6.1`.
@@ -207,9 +262,9 @@ claude --lean-on    # or --lean-max / --lean-off
 
 ---
 
-## Upstream baseline retained at v1.7.5
+## Upstream baseline retained (current tip v1.9.3)
 
-Everything in upstream through `v1.7.5` is the shared code base (OpenAI-compat proxy, provider import, lean mode, Bun standalone / `fv()` patches, ANSI green theme, update-prompt semver compare, etc.). This file only lists **fork deltas** after that point.
+Everything in upstream through `v1.9.3` is the shared code base (historical notes below still mention the v1.7.5 era) (OpenAI-compat proxy, provider import, lean mode, Bun standalone / `fv()` patches, ANSI green theme, update-prompt semver compare, etc.). This file only lists **fork deltas** after that point.
 
 When adding a new fork release:
 
