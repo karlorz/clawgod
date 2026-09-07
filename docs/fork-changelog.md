@@ -10,7 +10,7 @@ Upstream product URL / domain must not reappear in installers or self-update pat
 
 ---
 
-## Unreleased
+## v1.9.3-1 — argv0 launcher fix for agent-aware supervisors (2026-09-07)
 
 | Area | Change |
 |------|--------|
