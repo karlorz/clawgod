@@ -196,6 +196,13 @@ Since `@anthropic-ai/claude-code` v2.1.113, the npm package no longer ships `cli
 
 A `.source-version` stamp in `~/.clawgod/` records which native version was patched. On every launch the wrapper compares it against the latest binary in `versions/`; if the user upgraded Claude Code via the official installer, ClawGod auto-re-patches on the next run.
 
+## Agent-aware supervisors (herdr and similar)
+
+Supervisors that identify coding agents by process name or `argv[0]` (herdr, agent dashboards, "is my claude stuck" watchers) see ClawGod lanes correctly: the launchers (`claude` / `clawgod`, macOS/Linux) exec the Bun runtime with `argv[0]` set to `claude`, so the foreground process presents as `claude .../cli.cjs` and matches the official binary's signature.
+
+- **Windows:** the `claude.cmd` / `clawgod.cmd` shims still appear as `bun.exe` (no `argv[0]` override exists for `.cmd` launchers); process-name-based detection does not apply there.
+- **State accuracy** (working/idle/blocked) is the supervisor's own screen-parsing domain and is unaffected by this launcher detail.
+
 ## Update
 
 **Just run `claude update` as usual.** ClawGod patches the command to route through its own installer, which pulls the current Anthropic release from npm (`@anthropic-ai/claude-code-<plat>@latest`), re-extracts cli.js, re-applies patches, and rewrites the launcher. So the upstream update command keeps working the way you expect — you get the latest Claude, with patches still applied, in one step.
