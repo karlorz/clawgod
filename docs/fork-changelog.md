@@ -10,6 +10,14 @@ Upstream product URL / domain must not reappear in installers or self-update pat
 
 ---
 
+## v1.9.3-1 — argv0 launcher fix for agent-aware supervisors (2026-09-07)
+
+| Area | Change |
+|------|--------|
+| **Launcher (macOS/Linux)** | `exec -a claude` so agent-aware supervisors matching the official process name/`argv[0]` (e.g. herdr) detect clawgod lanes; previously the foreground process appeared as `bun ~/.clawgod/cli.cjs` and detection silently never matched. Windows `.cmd` shims unchanged (still `bun.exe`). |
+
+---
+
 ## v1.9.3-0 — merge upstream v1.9.3 (2026-09-05)
 
 **Base:** upstream `v1.9.3` + fork train. Self-version / tag: `1.9.3-0` / `v1.9.3-0`. Release published 2026-09-05 ~15:46Z. Compare: `v1.7.5-2...v1.9.3-0`.
@@ -62,6 +70,7 @@ cat ~/.clawgod/.clawgod-version
 ### Fork interest routing kept
 
 Product URLs, lean deny lists, compat-daily auto-issue, and fork identity docs remain on `karlorz/clawgod` only.
+
 
 ---
 
