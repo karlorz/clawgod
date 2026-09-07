@@ -2839,7 +2839,9 @@ if [ ! -x \"\$BUN_BIN\" ]; then
 fi
 export CLAUDE_CODE_EXECPATH=\"$CLAUDE_BIN.orig\"
 export HERDR_AGENT=\"\${HERDR_AGENT:-claude}\"
-exec \"\$BUN_BIN\" \"\$CLAWGOD_CLI\" \"\$@\""
+# Present argv[0] as \"claude\" so agent-aware supervisors (herdr and similar
+# process-name matchers) identify clawgod lanes; bun does not rewrite argv[0].
+exec -a claude \"\$BUN_BIN\" \"\$CLAWGOD_CLI\" \"\$@\""
 
 
 # Back up original claude (only once)
