@@ -410,8 +410,11 @@ jobs:
         run: |
           if (-not (Get-Command rg -ErrorAction SilentlyContinue)) {
             choco install ripgrep --yes --no-progress
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
-          rg --version | Select-Object -First 1
+          # Drain native stdout; Select-Object -First can stop rg early.
+          rg --version
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Add ClawGod launcher directory to PATH
         shell: powershell
@@ -424,8 +427,11 @@ jobs:
         run: |
           Write-Host "PowerShell $($PSVersionTable.PSVersion)"
           node --version
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           bun --version
-          rg --version | Select-Object -First 1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          rg --version
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Verify generated installers on Windows
         shell: powershell
