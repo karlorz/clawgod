@@ -1,4 +1,4 @@
-// Unit tests for classifierTimeoutFloor — the pure value parser behind the
+// Patch regression tests, including classifierTimeoutFloor — the parser behind the
 // classifier-timeout patch (see runtime-helpers.cjs). Gating
 // (globalThis.__clawgodPatches?.["classifier-timeout"]) and the
 // CLAWGOD_CLASSIFIER_TIMEOUT_MS read live in the injected patch code; the
@@ -12,6 +12,11 @@
 
 import { classifierTimeoutFloor as floor } from './runtime-helpers.cjs';
 import assert from 'node:assert/strict';
+import { copyFileSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { execFileSync } from 'node:child_process';
+import { runInNewContext } from 'node:vm';
 
 // legal values → parsed as the floor (injected Math.max applies it)
 assert.equal(floor('200000'), 200000);
@@ -51,3 +56,64 @@ assert.equal(patchRes('', true, 80000), 80000);
 assert.equal(patchRes(undefined, true, 80000), 80000);
 
 console.log('[patch.test] classifierTimeoutFloor semantics ok');
+
+// Exercise the real patcher against legacy bundles and the 2.1.268 chunk
+// layout (issues #175–177). Keep metadata and neighboring commands intact,
+// and evaluate the emitted gate with the feature both enabled and disabled.
+const ultraplanFixtures = [
+  { label: 'legacy literal', description: 'description:`Draft a plan`', original: '!1' },
+  { label: 'getter and flag helper', description: 'get description(){return`Draft a plan (${estimate()})`}', original: '$flag()' },
+  { label: '2.1.268 availability', description: 'get description(){return`Draft a plan (${estimate()})`}', original: '$flag()', metadata: 'availability:["claude-ai"],' },
+];
+const testDir = mkdtempSync(join(tmpdir(), 'clawgod-patch-test-'));
+try {
+  copyFileSync(new URL('./patch.mjs', import.meta.url), join(testDir, 'patch.mjs'));
+  for (const graph of [false, true]) {
+    if (graph) mkdirSync(join(testDir, 'bunfs'));
+    for (const fixture of ultraplanFixtures) {
+      const source = `var command={type:"local-jsx",name:"ultraplan",${fixture.description},argumentHint:"<prompt>",${fixture.metadata || ''}isEnabled:()=>${fixture.original},policyGate:policy,load:()=>load()};var neighbor={name:"other",argumentHint:"<prompt>",isEnabled:()=>!1};`;
+      const target = join(testDir, graph ? 'bunfs/commands.js' : 'cli.original.cjs');
+      if (graph) writeFileSync(join(testDir, 'cli.original.cjs'), '// entry');
+      writeFileSync(target, source);
+      const output = execFileSync(process.execPath, [join(testDir, 'patch.mjs')], { encoding: 'utf8' });
+      assert.match(output, /Ultraplan enable \(1 replacement in 1 file\)/, fixture.label);
+      const patched = readFileSync(target, 'utf8');
+      const enabled = `isEnabled:()=>${fixture.original}`;
+      assert.equal(patched, source.replace(enabled, `isEnabled:()=>(globalThis.__clawgodPatches?.["ultraplan"]!==!1?!0:${fixture.original})`));
+      for (const toggle of [undefined, true, false]) {
+        for (const upstream of [false, true]) {
+          let calls = 0;
+          const context = {
+            $flag: () => { calls++; return upstream; },
+            estimate: () => 'a few minutes', policy: () => false, load: () => 'loaded',
+            ...(toggle === undefined ? {} : { __clawgodPatches: { ultraplan: toggle } }),
+          };
+          const result = runInNewContext(`${patched};[command.isEnabled(),neighbor.isEnabled(),command.description,command.policyGate(),command.load()]`, context);
+          const originalValue = fixture.original === '!1' ? false : upstream;
+          assert.equal(result[0], toggle === false ? originalValue : true, fixture.label);
+          assert.equal(result[1], false);
+          assert.match(result[2], /^Draft a plan/);
+          assert.equal(result[3], false);
+          assert.equal(result[4], 'loaded');
+          assert.equal(calls, toggle === false && fixture.original !== '!1' ? 1 : 0);
+        }
+      }
+    }
+    // An unsupported shape must stay visible as a failure, even if a nearby
+    // command happens to contain the old argumentHint/isEnabled sequence.
+    for (const body of [
+      'description:"Future gate",argumentHint:"<prompt>",newMetadata:!0,isEnabled:()=>$flag()',
+      'description:"Cloud command stub"',
+    ]) {
+      const source = `var command={name:"ultraplan",${body}};var neighbor={name:"other",argumentHint:"<prompt>",isEnabled:()=>!1};`;
+      const target = join(testDir, graph ? 'bunfs/commands.js' : 'cli.original.cjs');
+      writeFileSync(target, source);
+      const output = execFileSync(process.execPath, [join(testDir, 'patch.mjs')], { encoding: 'utf8' });
+      assert.match(output, /Ultraplan enable — regex stale/);
+      assert.equal(readFileSync(target, 'utf8'), source);
+    }
+  }
+} finally {
+  rmSync(testDir, { recursive: true, force: true });
+}
+console.log('[patch.test] ultraplan bundle/graph compatibility and toggle semantics ok');

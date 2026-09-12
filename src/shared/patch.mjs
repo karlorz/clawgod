@@ -191,11 +191,14 @@ const patches = [
     // Older shape  : name:"ultraplan",description:`...`,argumentHint:"<prompt>",isEnabled:()=>!1
     // The middle metadata block changed from a literal description to a getter,
     // and the gate switched from a literal !1 to a GrowthBook-flag-check function call.
-    // Match both.
+    // v2.1.268 adds availability:["claude-ai"] between argumentHint and
+    // isEnabled. Preserve that metadata along with the original gate.
+    // Stop at the first argumentHint or another command's name so a changed
+    // gate cannot make the match spill into a neighboring command.
     id: 'ultraplan',
     toggleable: true,
     name: 'Ultraplan enable',
-    pattern: /(name:"ultraplan",[\s\S]{1,500}?argumentHint:"<prompt>",isEnabled:\(\)=>)(!1|[\w$]+\(\))/g,
+    pattern: /(name:"ultraplan",(?:(?!\b(?:name|argumentHint):)[\s\S]){1,500}?argumentHint:"<prompt>",(?:availability:\[[^\]\r\n]*\],)?isEnabled:\(\)=>)(!1|[\w$]+\(\))/g,
     replacer: (m, prefix, orig) => `${prefix}(${gate('ultraplan')}?!0:${orig})`,
     sentinel: 'name:"ultraplan"',
   },

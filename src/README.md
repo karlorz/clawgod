@@ -14,9 +14,11 @@ when either generated installer is missing or differs from its sources.
 
 ## Testing
 
-`src/shared/patch.test.mjs` holds unit tests for the classifier-timeout
-helper in `runtime-helpers.cjs` (a pure function, so no Claude bundle
-needed). Run locally with Node:
+`src/shared/patch.test.mjs` tests the classifier-timeout helper in
+`runtime-helpers.cjs` and runs the patcher on Ultraplan fixtures for legacy
+bundles and chunk graphs. It checks runtime toggles, metadata preservation,
+and rejection of unsupported shapes without changing neighboring commands.
+No Claude bundle is needed. Run locally with Node:
 
 ```bash
 node src/shared/patch.test.mjs
