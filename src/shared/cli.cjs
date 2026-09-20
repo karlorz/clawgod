@@ -145,7 +145,12 @@ if (config.baseURL && !_isAnthropicBaseURL(config.baseURL)) {
 if (config.timeoutMs) {
   process.env.API_TIMEOUT_MS ??= String(config.timeoutMs);
 }
-process.env.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC ??= '1';
+// Remote Control needs GrowthBook evaluation. Restrict network traffic by
+// default only in max mode; on/off retain upstream eligibility checks.
+// Explicit user environment settings still take precedence.
+if (existsSync(join(clawgodDir, '.lean-max')) && !existsSync(join(clawgodDir, '.lean-disabled'))) {
+  process.env.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC ??= '1';
+}
 process.env.DISABLE_INSTALLATION_CHECKS ??= '1';
 // Use system ripgrep (extracted vendor rg path was build-time-baked; system
 // rg is the most reliable fallback under Bun runtime).
@@ -264,5 +269,12 @@ require('./feature-gates.cjs');
 // see runtime-helpers.cjs). cli.original.cjs is a separate module scope, so
 // the patched bundle reaches helpers through globalThis only.
 require('./runtime-helpers.cjs');
+
+// Claude Code 2.1.271+ renders through Bun.ant.CellSegmenter, an
+// Anthropic-private Bun API that stock Bun does not ship. Without it the
+// renderer throws before the first frame and the TUI looks hung, so the shim
+// re-implements the API in JS. No-op when the real API exists or when the
+// bun-ant-shim feature is off (patches.json / CLAWGOD_FEATURE_BUN_ANT_SHIM).
+require('./bun-ant-shim.cjs');
 
 require('./cli.original.cjs');
