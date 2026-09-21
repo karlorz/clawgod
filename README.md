@@ -114,45 +114,16 @@ claude.orig         # Original unpatched version (auto-backed-up)
   "baseURL": "https://api.anthropic.com",
   "model": "",
   "smallModel": "",
+  "effort": "",
   "timeoutMs": 3000000
 }
 ```
 
-- **`apiKey` set** → ClawGod injects it as `ANTHROPIC_API_KEY` and isolates from `~/.claude/settings.json`. Works with Anthropic, DeepSeek, and OpenAI-compatible gateways. A non-Anthropic `baseURL` also populates `ANTHROPIC_AUTH_TOKEN` for gateway auth.
+- **`apiKey` set** → ClawGod injects it as `ANTHROPIC_API_KEY` and isolates from `~/.claude/settings.json`. Works with Anthropic, DeepSeek, and OpenAI-compatible gateways. A non-Anthropic `baseURL` populates only `ANTHROPIC_AUTH_TOKEN` for gateway auth.
 - **`apiKey` empty** → OAuth path. Run `claude auth login` once; `~/.claude` keeps hosting your subagents, skills, and MCP settings.
+- **`effort`** → Sets reasoning effort; an existing `CLAUDE_CODE_EFFORT_LEVEL` takes precedence. With `type: "grok"` or `"openai-compat"`, the proxy sends `reasoning_effort` even when Claude omits effort for a custom model alias. `low`, `medium`, `high`, and `xhigh` pass through; `max` maps to `xhigh`; `auto` omits the parameter to use the upstream default. Choose a level supported by your upstream model. Empty/unset configuration leaves request-level effort in control and adds no effort parameter when the request has none.
 - **OpenAI-compat providers** → set `"type": "grok"` or `"type": "openai-compat"` (plus `apiKey` / `baseURL` / `model` as needed). ClawGod starts a local Anthropic↔OpenAI translation proxy so Claude Code can talk to xAI/Grok and other Chat Completions APIs.
 - **One-shot import** → `claude import grok` or `claude import openai-compat` (after install ships `clawgod-import` from this fork’s releases).
-
-### Feature Toggles
-
-`~/.clawgod/patches.json` (auto-created empty) switches features off persistently — your choices survive updates and reinstalls. Absent key = on.
-
-```json
-{ "theme": false, "geo-neutralize": false }
-```
-
-| Feature id | Controls |
-|------------|----------|
-| `agent-teams` | Agent Teams always enabled |
-| `computer-use` | Computer Use unlock |
-| `ultraplan` | Ultraplan slash command |
-| `ultrareview` | Ultrareview slash command |
-| `voice-mode` | Voice Mode |
-| `auto-mode` | Auto-mode model selection on third-party APIs |
-| `theme` | Green brand/logo color scheme |
-| `geo-neutralize` | Geo/proxy steganography neutralization in system prompt |
-| `cyber-risk` | Removes CYBER_RISK_INSTRUCTION from system prompt |
-| `url-restriction` | Removes URL generation restriction from system prompt |
-| `cautious-actions` | Removes "Executing actions with care" section from system prompt |
-| `not-logged-in` | Removes "Not logged in" notice |
-| `message-filter` | Bypasses non-ant message/attachment filters |
-
-For a single launch, set an env var instead — feature id upper-cased, dashes to underscores:
-
-```bash
-CLAWGOD_FEATURE_THEME=false claude     # green theme off, this run only
-CLAWGOD_FEATURE_GEO_NEUTRALIZE=true claude  # temporarily re-enable one disabled in patches.json
-```
 
 ### Feature Toggles
 

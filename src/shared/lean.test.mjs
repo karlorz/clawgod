@@ -35,6 +35,7 @@ function launch(args = [], env = {}) {
   try {
     runInNewContext(wrapper, {
       process: proc,
+      URL,
       require(name) {
         if (name === 'os') return { homedir: () => home };
         if (name === './cli.original.cjs') { loaded = true; return {}; }
