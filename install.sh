@@ -966,7 +966,7 @@ function stripCacheControl(obj) {
   return out;
 }
 
-function translateRequest(body) {
+function translateRequest(body, configuredEffort) {
   var cleaned = stripCacheControl(body);
   var systemMsgs = translateSystem(cleaned.system);
   var userMsgs = translateMessages(cleaned.messages || []);
@@ -975,6 +975,13 @@ function translateRequest(body) {
   if (cleaned.temperature !== undefined) openaiBody.temperature = cleaned.temperature;
   if (cleaned.top_p !== undefined) openaiBody.top_p = cleaned.top_p;
   if (cleaned.stop_sequences) openaiBody.stop = cleaned.stop_sequences;
+  // Claude can omit output_config for unknown model aliases. Keep an explicit
+  // launcher setting authoritative, matching CLAUDE_CODE_EFFORT_LEVEL priority.
+  var effort = configuredEffort || (cleaned.output_config && cleaned.output_config.effort);
+  if (effort && effort !== 'auto') {
+    // Chat Completions calls the highest effort xhigh, not Claude's max.
+    openaiBody.reasoning_effort = effort === 'max' ? 'xhigh' : effort;
+  }
   var tools = translateTools(cleaned.tools);
   if (tools) openaiBody.tools = tools;
   if (cleaned.stream) openaiBody.stream_options = { include_usage: true };
@@ -1082,7 +1089,7 @@ function startProxy(config) {
       var requestModel = body.model || config.model || '';
       var isStream = !!body.stream;
       var openaiBody;
-      try { openaiBody = translateRequest(body); } catch (e) {
+      try { openaiBody = translateRequest(body, config.effort); } catch (e) {
         return new Response(JSON.stringify({ type: 'error', error: { type: 'invalid_request_error', message: 'Translation error: ' + e.message } }), { status: 400, headers: { 'Content-Type': 'application/json' } });
       }
 
@@ -1371,6 +1378,7 @@ const defaultConfig = {
   baseURL: 'https://api.anthropic.com',
   model: '',
   smallModel: '',
+  effort: '',
   timeoutMs: 3000000,
 };
 
@@ -1402,8 +1410,9 @@ if (_proxyTypes[config.type]) {
       apiKey: _proxyKey,
       baseURL: config.baseURL || (config.type === 'grok' ? 'https://api.x.ai/v1' : ''),
       model: config.model || '',
+      effort: process.env.CLAUDE_CODE_EFFORT_LEVEL ?? config.effort,
     });
-    process.env.ANTHROPIC_API_KEY = 'proxy-passthrough';
+    delete process.env.ANTHROPIC_API_KEY;
     process.env.ANTHROPIC_BASE_URL = 'http://127.0.0.1:' + _proxy.port;
     process.env.ANTHROPIC_AUTH_TOKEN = 'proxy-passthrough';
     if (config.model) process.env.ANTHROPIC_MODEL = config.model;
@@ -1412,32 +1421,40 @@ if (_proxyTypes[config.type]) {
     process.env.CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS ??= '1';
     process.on('exit', function () { try { _proxy.stop(); } catch {} });
     process.stderr.write('[clawgod] OpenAI-compat proxy on port ' + _proxy.port + ' (type: ' + config.type + ')\n');
-    config = { ...defaultConfig };  // prevent fallthrough to apiKey/baseURL injection below
+    config = { ...config, apiKey: '', baseURL: '', model: '', smallModel: '' };  // prevent fallthrough to apiKey/baseURL injection below
   } else {
     process.stderr.write('[clawgod] Warning: type=' + config.type + ' but no API key found\n');
   }
 }
 
 // Host match uses URL hostname (not substring) to avoid false positives
-// (e.g. "notanthropic.com" or query-string bait).
+// (e.g. "notanthropic.com" or query-string bait). Fall back to a hostname
+// parse when `URL` is missing (Node vm sandboxes used by launcher tests).
+var _isAnthropicHost = function (h) {
+  h = String(h || '').toLowerCase();
+  return h === 'anthropic.com' || h.endsWith('.anthropic.com');
+};
 var _isAnthropicBaseURL = function (u) {
   try {
-    var h = new URL(String(u)).hostname.toLowerCase();
-    return h === 'anthropic.com' || h.endsWith('.anthropic.com');
-  } catch (e) {
-    return false;
-  }
+    if (typeof URL === 'function') return _isAnthropicHost(new URL(String(u)).hostname);
+  } catch (e) {}
+  var host = String(u || '').replace(/^[a-z][a-z0-9+.-]*:\/\//i, '').split(/[/?#]/)[0].split('@').pop().split(':')[0];
+  return _isAnthropicHost(host);
 };
 
 const hasProviderApiKey = !!config.apiKey;
 
 if (hasProviderApiKey) {
-  process.env.ANTHROPIC_API_KEY = config.apiKey;
   if (config.baseURL) process.env.ANTHROPIC_BASE_URL = config.baseURL;
   if (config.model) process.env.ANTHROPIC_MODEL = config.model;
   if (config.smallModel) process.env.ANTHROPIC_SMALL_FAST_MODEL = config.smallModel;
   if (config.baseURL && !_isAnthropicBaseURL(config.baseURL)) {
-    process.env.ANTHROPIC_AUTH_TOKEN ??= config.apiKey;
+    delete process.env.ANTHROPIC_API_KEY;
+    const existingToken = (process.env.ANTHROPIC_AUTH_TOKEN || '').trim();
+    process.env.ANTHROPIC_AUTH_TOKEN = existingToken || config.apiKey;
+  } else {
+    delete process.env.ANTHROPIC_AUTH_TOKEN;
+    process.env.ANTHROPIC_API_KEY = config.apiKey;
   }
 } else if (config.baseURL && config.baseURL !== defaultConfig.baseURL) {
   process.env.ANTHROPIC_BASE_URL ??= config.baseURL;
@@ -1473,6 +1490,10 @@ if (config.baseURL && !_isAnthropicBaseURL(config.baseURL)) {
       }
     } catch {}
   }
+}
+
+if (config.effort) {
+  process.env.CLAUDE_CODE_EFFORT_LEVEL ??= config.effort;
 }
 
 if (config.timeoutMs) {
