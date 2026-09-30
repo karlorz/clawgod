@@ -2,11 +2,11 @@
 
 [English](README.md) | [中文](README_ZH.md) | [日本語](README_JP.md)
 
-[![Latest](https://img.shields.io/github/v/release/karlorz/clawgod?style=flat&label=Latest)](https://github.com/karlorz/clawgod/releases/latest)
-[![Released](https://img.shields.io/github/release-date/karlorz/clawgod?style=flat&label=Released)](https://github.com/karlorz/clawgod/releases/latest)
-[![Downloads](https://img.shields.io/github/downloads/karlorz/clawgod/total?style=flat&label=Downloads)](https://github.com/karlorz/clawgod/releases)
-[![Compat](https://img.shields.io/github/actions/workflow/status/karlorz/clawgod/compat-daily.yml?branch=main&style=flat&label=Compat)](https://github.com/karlorz/clawgod/actions/workflows/compat-daily.yml)
-[![Claude tested](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/karlorz/clawgod/badges/claude-version.json&style=flat)](https://github.com/karlorz/clawgod/actions/workflows/compat-daily.yml)
+[![Latest](https://img.shields.io/github/v/release/0chencc/clawgod?style=flat&label=Latest)](https://github.com/0Chencc/clawgod/releases/latest)
+[![Released](https://img.shields.io/github/release-date/0chencc/clawgod?style=flat&label=Released)](https://github.com/0Chencc/clawgod/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/0chencc/clawgod/total?style=flat&label=Downloads)](https://github.com/0Chencc/clawgod/releases)
+[![Compat](https://img.shields.io/github/actions/workflow/status/0chencc/clawgod/compat-daily.yml?branch=main&style=flat&label=Compat)](https://github.com/0Chencc/clawgod/actions/workflows/compat-daily.yml)
+[![Claude tested](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/0Chencc/clawgod/badges/claude-version.json&style=flat)](https://github.com/0Chencc/clawgod/actions/workflows/compat-daily.yml)
 
 > [Claude Code](https://docs.anthropic.com/en/docs/claude-code) 上帝模式。
 
@@ -27,12 +27,12 @@
 
 **macOS / Linux:**
 ```bash
-curl -fsSL https://github.com/karlorz/clawgod/releases/latest/download/install.sh | bash
+curl -fsSL https://github.com/0Chencc/clawgod/releases/latest/download/install.sh | bash
 ```
 
 **Windows (PowerShell):**
 ```powershell
-irm https://github.com/karlorz/clawgod/releases/latest/download/install.ps1 | iex
+irm https://github.com/0Chencc/clawgod/releases/latest/download/install.ps1 | iex
 ```
 
 绿色 Logo = 已 Patch。橙色 Logo = 原版。
@@ -119,9 +119,32 @@ claude.orig         # 原版未修改版本（自动备份）
 }
 ```
 
-- **填写 `apiKey`**：ClawGod 注入 `ANTHROPIC_API_KEY` 并与 `~/.claude/settings.json` 隔离。可用于 Anthropic 官方、DeepSeek，以及任何 OpenAI-compatible 网关；`baseURL` 指向非 Anthropic 域名时，仅注入 `ANTHROPIC_AUTH_TOKEN` 以适配网关鉴权。
+- **填写 `apiKey`**：ClawGod 注入 `ANTHROPIC_API_KEY` 并与 `~/.claude/settings.json` 隔离。默认要求上游兼容 Anthropic Messages 协议；仅支持 Chat Completions 的网关请使用下方配置。`baseURL` 指向非 Anthropic 域名时，仅注入 `ANTHROPIC_AUTH_TOKEN` 以适配网关鉴权。
 - **留空 `apiKey`**：走 OAuth 路径，执行一次 `claude auth login`，`~/.claude` 下的 subagents / skills / MCP 配置继续有效。
-- **`effort`**：设置推理强度，已有的 `CLAUDE_CODE_EFFORT_LEVEL` 优先。使用 `type: "grok"` 或 `"openai-compat"` 时，即使 Claude 没有为自定义模型发送 effort，代理也会发送配置对应的 `reasoning_effort`。`low`、`medium`、`high`、`xhigh` 原样传递，`max` 转为 `xhigh`，`auto` 则省略该参数、使用上游默认值。请选用上游模型支持的档位。配置为空或未设置时，沿用请求中的 effort；请求也未指定时不添加该参数。
+- **`effort`**：设置推理强度，已有的 `CLAUDE_CODE_EFFORT_LEVEL` 优先。使用 `protocol: "openai-chat"`、`type: "grok"` 或 `"openai-compat"` 时，即使 Claude 没有为自定义模型发送 effort，代理也会发送配置对应的 `reasoning_effort`。`low`、`medium`、`high`、`xhigh` 原样传递，`max` 转为 `xhigh`，`auto` 则省略该参数、使用上游默认值。请选用上游模型支持的档位。配置为空或未设置时，沿用请求中的 effort；请求也未指定时不添加该参数。
+
+### OpenAI Chat Completions 端点
+
+如果上游提供 `/v1/chat/completions`，请配置：
+
+```json
+{
+  "protocol": "openai-chat",
+  "apiKey": "sk-...",
+  "baseURL": "https://example.com/v1",
+  "model": "上游模型名称",
+  "smallModel": "上游模型名称"
+}
+```
+
+`baseURL` 填 API 基础地址（按上游要求包含 `/v1`），**不要**填写完整的 `/chat/completions` 路径。模型名称必须是上游支持的 ID。ClawGod 会在启动器进程内启动本地转换代理，无需部署外部网关或独立服务。`timeoutMs` 同时约束上游请求和响应流；已有的 `API_TIMEOUT_MS` 优先。
+
+- 不填 `protocol` 时保持原有行为。继续兼容 `type: "openai-compat"` 和 `type: "grok"`；显式 `protocol` 优先。`protocol: "anthropic"` 直接使用 Messages 协议。Grok 默认地址为 `https://api.x.ai/v1`，继续支持从 Grok 配置或环境变量读取密钥；其他 Chat 提供商必须填写 API 基础地址和密钥。
+- 支持文本、system、工具调用/结果、强制工具选择、并行工具控制、流式响应、usage，以及 base64/URL 图片。并行工具参数会在组装完整并验证后输出内容块；文本仍实时输出。上游缺少 usage 时保持为零，不伪造精确计数。
+- base64 PDF 转为 Chat Completions 的 `file` 块，要求上游模型/API 支持文件；文本型文档转为文本。PDF URL、文档引用、非文本工具结果、服务端工具和结构化输出格式会明确报错。历史 Anthropic thinking/signature 块会省略，模型专属推理能力无法无损转换。
+- `/v1/messages/count_tokens` 使用本地估算，不额外调用计费接口。响应头 `x-clawgod-token-count: estimate` 标记估算结果。算法为文本 UTF-8 字节数 / 3 加消息开销，每张图片预算 1600 token，PDF 按解码字节数 / 3 估算。这不是模型 tokenizer；PDF 字节数不等于页数，估算不能保证上下文窗口一定容纳得下。
+- Chat 的 `stop` 统一映射为 `end_turn`，因为该协议不区分自然结束与命中停止序列。`length`、`tool_calls`、`content_filter` 分别映射为 `max_tokens`、`tool_use`、`refusal`。上游 HTTP 错误保留状态码和 `Retry-After`；损坏或提前截断的流会报错。
+- 暂不支持 `/v1/responses` 和自动协议探测；`openai-chat` 仅用于 Chat Completions 端点。
 
 ### 功能开关
 
@@ -187,12 +210,12 @@ claude update --no-upgrade        # 不下载新版，只用最新 patcher 重�
 
 **macOS / Linux:**
 ```bash
-curl -fsSL https://github.com/karlorz/clawgod/releases/latest/download/install.sh | bash
+curl -fsSL https://github.com/0Chencc/clawgod/releases/latest/download/install.sh | bash
 ```
 
 **Windows:**
 ```powershell
-irm https://github.com/karlorz/clawgod/releases/latest/download/install.ps1 | iex
+irm https://github.com/0Chencc/clawgod/releases/latest/download/install.ps1 | iex
 ```
 
 如果你想脱离 ClawGod、使用 Anthropic 原本的 `claude update`（它会写到自己管的目录、并把我们的 launcher 替换掉），请先卸载：
@@ -205,43 +228,29 @@ bash ~/.clawgod/install.sh --uninstall
 
 **macOS / Linux:**
 ```bash
-curl -fsSL https://github.com/karlorz/clawgod/releases/latest/download/install.sh | bash -s -- --uninstall
+curl -fsSL https://github.com/0Chencc/clawgod/releases/latest/download/install.sh | bash -s -- --uninstall
 hash -r  # 刷新 shell 缓存
 ```
 
 **Windows:**
 ```powershell
-irm https://github.com/karlorz/clawgod/releases/latest/download/install.ps1 -OutFile install.ps1; .\install.ps1 -Uninstall
+irm https://github.com/0Chencc/clawgod/releases/latest/download/install.ps1 -OutFile install.ps1; .\install.ps1 -Uninstall
 ```
 
 卸载会把 `claude.orig` 还原成 `claude`，并移除 `clawgod` 别名。
 
 > 安装或卸载后，如果命令未立即生效，请重启终端或执行 `hash -r`。
 
-## 从上游 ClawGod 迁移
-
-若你之前从 `0Chencc/clawgod` 安装，请**用本 fork 安装脚本再跑一次**，这样 `claude update` 与版本检查不会再请求上游：
-
-```bash
-curl -fsSL https://github.com/karlorz/clawgod/releases/latest/download/install.sh | bash
-```
-
-```powershell
-irm https://github.com/karlorz/clawgod/releases/latest/download/install.ps1 | iex
-```
-
-## Fork 发布与 CI 约定
-
-- **禁止覆盖上游 tag**：`v1.6.1` 等上游标签不动；本 fork 在该线上改动用 `v1.6.1-0`、`v1.6.1-1`…  
-- **CI 逻辑与上游一致**（`release` / `compat-daily` / `cache-cleanup-weekly`），仓库目标为本 fork。  
-- **compat-daily 在 Claude 2.1.214 上预期失败**（补丁尚未修），与上游同类失败，不是隔离回归。
-
 ## 许可证
 
 GPL-3.0 — 与 Anthropic 无关，风险自负。
 
-衍生自 [0Chencc/clawgod](https://github.com/0Chencc/clawgod)（GPL-3.0）。本 fork 的安装与更新入口**仅**指向 [karlorz/clawgod](https://github.com/karlorz/clawgod)。
-
 ## Star History
 
-[![Star History Chart](https://api.star-history.com/chart?repos=karlorz/clawgod&type=date&legend=top-left)](https://www.star-history.com/?repos=karlorz%2Fclawgod&type=date&legend=top-left)
+<a href="https://www.star-history.com/?repos=0chencc%2Fclawgod&type=date&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=0chencc/clawgod&type=date&theme=dark&legend=top-left&sealed_token=ntGY6im49ymMeD9BXSi0OmH_kyhnnTL9pGyfm2rLYBTlzEcTeQf4o6RA6HqXhGVzdD6xXlk20KCFAyk4gWIpEda3TVEm4re4eJ0xoosRcUdYMui5B7Hp6e3YBUAr2tWmCZu2ZkRWVCOEdCOldK9S_h7Jn7NIjGEEgWywl2ZZOq7xpUpT4IkkXKKxGNJi" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=0chencc/clawgod&type=date&legend=top-left&sealed_token=ntGY6im49ymMeD9BXSi0OmH_kyhnnTL9pGyfm2rLYBTlzEcTeQf4o6RA6HqXhGVzdD6xXlk20KCFAyk4gWIpEda3TVEm4re4eJ0xoosRcUdYMui5B7Hp6e3YBUAr2tWmCZu2ZkRWVCOEdCOldK9S_h7Jn7NIjGEEgWywl2ZZOq7xpUpT4IkkXKKxGNJi" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=0chencc/clawgod&type=date&legend=top-left&sealed_token=ntGY6im49ymMeD9BXSi0OmH_kyhnnTL9pGyfm2rLYBTlzEcTeQf4o6RA6HqXhGVzdD6xXlk20KCFAyk4gWIpEda3TVEm4re4eJ0xoosRcUdYMui5B7Hp6e3YBUAr2tWmCZu2ZkRWVCOEdCOldK9S_h7Jn7NIjGEEgWywl2ZZOq7xpUpT4IkkXKKxGNJi" />
+ </picture>
+</a>

@@ -2,11 +2,11 @@
 
 [English](README.md) | [中文](README_ZH.md) | [日本語](README_JP.md)
 
-[![Latest](https://img.shields.io/github/v/release/karlorz/clawgod?style=flat&label=Latest)](https://github.com/karlorz/clawgod/releases/latest)
-[![Released](https://img.shields.io/github/release-date/karlorz/clawgod?style=flat&label=Released)](https://github.com/karlorz/clawgod/releases/latest)
-[![Downloads](https://img.shields.io/github/downloads/karlorz/clawgod/total?style=flat&label=Downloads)](https://github.com/karlorz/clawgod/releases)
-[![Compat](https://img.shields.io/github/actions/workflow/status/karlorz/clawgod/compat-daily.yml?branch=main&style=flat&label=Compat)](https://github.com/karlorz/clawgod/actions/workflows/compat-daily.yml)
-[![Claude tested](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/karlorz/clawgod/badges/claude-version.json&style=flat)](https://github.com/karlorz/clawgod/actions/workflows/compat-daily.yml)
+[![Latest](https://img.shields.io/github/v/release/0chencc/clawgod?style=flat&label=Latest)](https://github.com/0Chencc/clawgod/releases/latest)
+[![Released](https://img.shields.io/github/release-date/0chencc/clawgod?style=flat&label=Released)](https://github.com/0Chencc/clawgod/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/0chencc/clawgod/total?style=flat&label=Downloads)](https://github.com/0Chencc/clawgod/releases)
+[![Compat](https://img.shields.io/github/actions/workflow/status/0chencc/clawgod/compat-daily.yml?branch=main&style=flat&label=Compat)](https://github.com/0Chencc/clawgod/actions/workflows/compat-daily.yml)
+[![Claude tested](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/0Chencc/clawgod/badges/claude-version.json&style=flat)](https://github.com/0Chencc/clawgod/actions/workflows/compat-daily.yml)
 
 > God mode for [Claude Code](https://docs.anthropic.com/en/docs/claude-code).
 
@@ -27,12 +27,12 @@ Install these **before** running the ClawGod installer:
 
 **macOS / Linux:**
 ```bash
-curl -fsSL https://github.com/karlorz/clawgod/releases/latest/download/install.sh | bash
+curl -fsSL https://github.com/0Chencc/clawgod/releases/latest/download/install.sh | bash
 ```
 
 **Windows (PowerShell):**
 ```powershell
-irm https://github.com/karlorz/clawgod/releases/latest/download/install.ps1 | iex
+irm https://github.com/0Chencc/clawgod/releases/latest/download/install.ps1 | iex
 ```
 
 Green logo = patched. Orange logo = original.
@@ -119,11 +119,32 @@ claude.orig         # Original unpatched version (auto-backed-up)
 }
 ```
 
-- **`apiKey` set** → ClawGod injects it as `ANTHROPIC_API_KEY` and isolates from `~/.claude/settings.json`. Works with Anthropic, DeepSeek, and OpenAI-compatible gateways. A non-Anthropic `baseURL` populates only `ANTHROPIC_AUTH_TOKEN` for gateway auth.
+- **`apiKey` set** → ClawGod injects it as `ANTHROPIC_API_KEY` and isolates from `~/.claude/settings.json`. The default protocol requires an Anthropic Messages-compatible endpoint. For Chat Completions gateways, use the configuration below. A non-Anthropic `baseURL` populates only `ANTHROPIC_AUTH_TOKEN` for gateway auth.
 - **`apiKey` empty** → OAuth path. Run `claude auth login` once; `~/.claude` keeps hosting your subagents, skills, and MCP settings.
-- **`effort`** → Sets reasoning effort; an existing `CLAUDE_CODE_EFFORT_LEVEL` takes precedence. With `type: "grok"` or `"openai-compat"`, the proxy sends `reasoning_effort` even when Claude omits effort for a custom model alias. `low`, `medium`, `high`, and `xhigh` pass through; `max` maps to `xhigh`; `auto` omits the parameter to use the upstream default. Choose a level supported by your upstream model. Empty/unset configuration leaves request-level effort in control and adds no effort parameter when the request has none.
-- **OpenAI-compat providers** → set `"type": "grok"` or `"type": "openai-compat"` (plus `apiKey` / `baseURL` / `model` as needed). ClawGod starts a local Anthropic↔OpenAI translation proxy so Claude Code can talk to xAI/Grok and other Chat Completions APIs.
-- **One-shot import** → `claude import grok` or `claude import openai-compat` (after install ships `clawgod-import` from this fork’s releases).
+- **`effort`** → Sets reasoning effort; an existing `CLAUDE_CODE_EFFORT_LEVEL` takes precedence. With `protocol: "openai-chat"`, `type: "grok"` or `"openai-compat"`, the proxy sends `reasoning_effort` even when Claude omits effort for a custom model alias. `low`, `medium`, `high`, and `xhigh` pass through; `max` maps to `xhigh`; `auto` omits the parameter to use the upstream default. Choose a level supported by your upstream model. Empty/unset configuration leaves request-level effort in control and adds no effort parameter when the request has none.
+
+### OpenAI Chat Completions endpoints
+
+For an endpoint that exposes `/v1/chat/completions`, configure:
+
+```json
+{
+  "protocol": "openai-chat",
+  "apiKey": "sk-...",
+  "baseURL": "https://example.com/v1",
+  "model": "your-upstream-model",
+  "smallModel": "your-upstream-model"
+}
+```
+
+`baseURL` is the API base (including `/v1` when required), **not** the full `/chat/completions` URL. Set the model names to IDs accepted by your provider. ClawGod starts a loopback proxy inside the launcher process; no external gateway or separate service is required. `timeoutMs` also covers the upstream request and stream; an existing `API_TIMEOUT_MS` takes precedence.
+
+- Omitting `protocol` keeps the existing behavior. `type: "openai-compat"` and `type: "grok"` remain supported; an explicit `protocol` takes precedence. `protocol: "anthropic"` uses Messages directly. Grok defaults to `https://api.x.ai/v1` and retains its settings/environment API key fallback. Other Chat providers require an explicit API base and key.
+- Supports text, system prompts, tool calls/results, forced tool selection and parallel-tool controls, streaming, usage, and base64/URL images. Parallel tool arguments are assembled and validated before their content blocks are emitted; text still streams immediately. Missing upstream usage remains zero rather than a fabricated exact count.
+- Base64 PDFs are sent as Chat Completions `file` parts and require file support in the upstream model/API. Text documents are sent as text. PDF URLs, document citations, non-text tool results, server tools, and structured output formats are rejected with a clear error. Historical Anthropic thinking/signature blocks are omitted. Model-specific reasoning features are not losslessly translated.
+- `/v1/messages/count_tokens` estimates locally without a billed generation request. The `x-clawgod-token-count: estimate` response header marks the result. It uses UTF-8 text bytes / 3 plus message overhead, 1600 tokens per image, and decoded PDF bytes / 3. This is a rough budget, not the model's tokenizer; PDF byte size does not reflect page count and the estimate cannot guarantee context-window fit.
+- Chat `stop` maps to `end_turn`: the protocol does not distinguish natural completion from a matched stop sequence. `length`, `tool_calls`, and `content_filter` map to `max_tokens`, `tool_use`, and `refusal`. Upstream HTTP errors retain their status and `Retry-After`; malformed or truncated streams produce an error.
+- `/v1/responses` and automatic protocol detection are not supported. Use `openai-chat` only for Chat Completions endpoints.
 
 ### Feature Toggles
 
@@ -172,13 +193,6 @@ Since `@anthropic-ai/claude-code` v2.1.113, the npm package no longer ships `cli
 
 A `.source-version` stamp in `~/.clawgod/` records which native version was patched. On every launch the wrapper compares it against the latest binary in `versions/`; if the user upgraded Claude Code via the official installer, ClawGod auto-re-patches on the next run.
 
-## Agent-aware supervisors (herdr and similar)
-
-Supervisors that identify coding agents by process name or `argv[0]` (herdr, agent dashboards, "is my claude stuck" watchers) see ClawGod lanes correctly: the launchers (`claude` / `clawgod`, macOS/Linux) exec the Bun runtime with `argv[0]` set to `claude`, so the foreground process presents as `claude .../cli.cjs` and matches the official binary's signature.
-
-- **Windows:** the `claude.cmd` / `clawgod.cmd` shims still appear as `bun.exe` (no `argv[0]` override exists for `.cmd` launchers); process-name-based detection does not apply there.
-- **State accuracy** (working/idle/blocked) is the supervisor's own screen-parsing domain and is unaffected by this launcher detail.
-
 ## Update
 
 **Just run `claude update` as usual.** ClawGod patches the command to route through its own installer, which pulls the current Anthropic release from npm (`@anthropic-ai/claude-code-<plat>@latest`), re-extracts cli.js, re-applies patches, and rewrites the launcher. So the upstream update command keeps working the way you expect — you get the latest Claude, with patches still applied, in one step.
@@ -196,12 +210,12 @@ If you'd rather invoke the installer directly (same effect, both paths fetch the
 
 **macOS / Linux:**
 ```bash
-curl -fsSL https://github.com/karlorz/clawgod/releases/latest/download/install.sh | bash
+curl -fsSL https://github.com/0Chencc/clawgod/releases/latest/download/install.sh | bash
 ```
 
 **Windows:**
 ```powershell
-irm https://github.com/karlorz/clawgod/releases/latest/download/install.ps1 | iex
+irm https://github.com/0Chencc/clawgod/releases/latest/download/install.ps1 | iex
 ```
 
 If you'd rather drop ClawGod and use Anthropic's original `claude update` (which manages its own paths and would overwrite our launcher), uninstall first:
@@ -214,60 +228,29 @@ bash ~/.clawgod/install.sh --uninstall
 
 **macOS / Linux:**
 ```bash
-curl -fsSL https://github.com/karlorz/clawgod/releases/latest/download/install.sh | bash -s -- --uninstall
+curl -fsSL https://github.com/0Chencc/clawgod/releases/latest/download/install.sh | bash -s -- --uninstall
 hash -r  # refresh shell cache
 ```
 
 **Windows:**
 ```powershell
-irm https://github.com/karlorz/clawgod/releases/latest/download/install.ps1 -OutFile install.ps1; .\install.ps1 -Uninstall
+irm https://github.com/0Chencc/clawgod/releases/latest/download/install.ps1 -OutFile install.ps1; .\install.ps1 -Uninstall
 ```
 
 Uninstall restores `claude.orig → claude` and removes the `clawgod` alias.
 
 > After install or uninstall, restart your terminal or run `hash -r` if the command doesn't take effect immediately.
 
-## Migrating from upstream ClawGod
-
-If you previously installed from `0Chencc/clawgod`, **do not rely on `claude update` yet** — the old wrapper still curls upstream. Run **this** fork’s installer **once** from a shell; it rewrites `~/.clawgod/` (wrapper, patcher) and the `claude` / `clawgod` launchers so all later self-updates hit **only** this repo:
-
-```bash
-curl -fsSL https://github.com/karlorz/clawgod/releases/latest/download/install.sh | bash
-```
-
-```powershell
-irm https://github.com/karlorz/clawgod/releases/latest/download/install.ps1 | iex
-```
-
-After that one-time reinstall, `claude update` is safe on this machine (still ClawGod self-update → **this** fork’s `install.sh` / `install.ps1`). Verify with:
-
-```bash
-grep -E 'karlorz/clawgod|0Chencc' ~/.clawgod/cli.cjs | head
-# expect karlorz only
-cat ~/.clawgod/.clawgod-version
-# expect 1.9.3-1 (or newer fork train)
-```
-
-## Fork release & CI policy
-
-**Tags (do not override upstream):** Upstream tags such as `v1.6.1` stay frozen at the upstream commit. Fork-only changes based on that line use a **patch train**:
-
-| Kind | Example | Rule |
-|------|---------|------|
-| Upstream release (immutable) | `v1.6.1` | Never move, retag, or re-upload over this tag |
-| First fork patch on that base | `v1.6.1-0` | First own release for this line |
-| Later fork patches | `v1.6.1-1`, `v1.6.1-2`, … | Increment the suffix only |
-
-Release workflow trigger remains `v*` (same as [upstream `release.yml`](https://github.com/0Chencc/clawgod/blob/main/.github/workflows/release.yml)). Install notes use `${{ github.repository }}` → **this** fork only.
-
-**CI parity:** Workflow YAML for `release.yml`, `compat-daily.yml`, and `cache-cleanup-weekly.yml` matches upstream logic; all repo-scoped actions use `github.repository` / `GITHUB_REPOSITORY` (this fork), not `0Chencc/clawgod`.
-
 ## License
 
 GPL-3.0 — Not affiliated with Anthropic. Use at your own risk.
 
-Derived from [0Chencc/clawgod](https://github.com/0Chencc/clawgod) (GPL-3.0). This fork’s install and update endpoints are **only** [karlorz/clawgod](https://github.com/karlorz/clawgod).
-
 ## Star History
 
-[![Star History Chart](https://api.star-history.com/chart?repos=karlorz/clawgod&type=date&legend=top-left)](https://www.star-history.com/?repos=karlorz%2Fclawgod&type=date&legend=top-left)
+<a href="https://www.star-history.com/?repos=0chencc%2Fclawgod&type=date&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=0chencc/clawgod&type=date&theme=dark&legend=top-left&sealed_token=ntGY6im49ymMeD9BXSi0OmH_kyhnnTL9pGyfm2rLYBTlzEcTeQf4o6RA6HqXhGVzdD6xXlk20KCFAyk4gWIpEda3TVEm4re4eJ0xoosRcUdYMui5B7Hp6e3YBUAr2tWmCZu2ZkRWVCOEdCOldK9S_h7Jn7NIjGEEgWywl2ZZOq7xpUpT4IkkXKKxGNJi" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=0chencc/clawgod&type=date&legend=top-left&sealed_token=ntGY6im49ymMeD9BXSi0OmH_kyhnnTL9pGyfm2rLYBTlzEcTeQf4o6RA6HqXhGVzdD6xXlk20KCFAyk4gWIpEda3TVEm4re4eJ0xoosRcUdYMui5B7Hp6e3YBUAr2tWmCZu2ZkRWVCOEdCOldK9S_h7Jn7NIjGEEgWywl2ZZOq7xpUpT4IkkXKKxGNJi" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=0chencc/clawgod&type=date&legend=top-left&sealed_token=ntGY6im49ymMeD9BXSi0OmH_kyhnnTL9pGyfm2rLYBTlzEcTeQf4o6RA6HqXhGVzdD6xXlk20KCFAyk4gWIpEda3TVEm4re4eJ0xoosRcUdYMui5B7Hp6e3YBUAr2tWmCZu2ZkRWVCOEdCOldK9S_h7Jn7NIjGEEgWywl2ZZOq7xpUpT4IkkXKKxGNJi" />
+ </picture>
+</a>

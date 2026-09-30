@@ -2,11 +2,11 @@
 
 [English](README.md) | [中文](README_ZH.md) | [日本語](README_JP.md)
 
-[![Latest](https://img.shields.io/github/v/release/karlorz/clawgod?style=flat&label=Latest)](https://github.com/karlorz/clawgod/releases/latest)
-[![Released](https://img.shields.io/github/release-date/karlorz/clawgod?style=flat&label=Released)](https://github.com/karlorz/clawgod/releases/latest)
-[![Downloads](https://img.shields.io/github/downloads/karlorz/clawgod/total?style=flat&label=Downloads)](https://github.com/karlorz/clawgod/releases)
-[![Compat](https://img.shields.io/github/actions/workflow/status/karlorz/clawgod/compat-daily.yml?branch=main&style=flat&label=Compat)](https://github.com/karlorz/clawgod/actions/workflows/compat-daily.yml)
-[![Claude tested](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/karlorz/clawgod/badges/claude-version.json&style=flat)](https://github.com/karlorz/clawgod/actions/workflows/compat-daily.yml)
+[![Latest](https://img.shields.io/github/v/release/0chencc/clawgod?style=flat&label=Latest)](https://github.com/0Chencc/clawgod/releases/latest)
+[![Released](https://img.shields.io/github/release-date/0chencc/clawgod?style=flat&label=Released)](https://github.com/0Chencc/clawgod/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/0chencc/clawgod/total?style=flat&label=Downloads)](https://github.com/0Chencc/clawgod/releases)
+[![Compat](https://img.shields.io/github/actions/workflow/status/0chencc/clawgod/compat-daily.yml?branch=main&style=flat&label=Compat)](https://github.com/0Chencc/clawgod/actions/workflows/compat-daily.yml)
+[![Claude tested](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/0Chencc/clawgod/badges/claude-version.json&style=flat)](https://github.com/0Chencc/clawgod/actions/workflows/compat-daily.yml)
 
 > [Claude Code](https://docs.anthropic.com/en/docs/claude-code) ゴッドモード。
 
@@ -27,12 +27,12 @@ ClawGod インストーラ実行**前**に揃えておくもの：
 
 **macOS / Linux:**
 ```bash
-curl -fsSL https://github.com/karlorz/clawgod/releases/latest/download/install.sh | bash
+curl -fsSL https://github.com/0Chencc/clawgod/releases/latest/download/install.sh | bash
 ```
 
 **Windows (PowerShell):**
 ```powershell
-irm https://github.com/karlorz/clawgod/releases/latest/download/install.ps1 | iex
+irm https://github.com/0Chencc/clawgod/releases/latest/download/install.ps1 | iex
 ```
 
 緑のロゴ = パッチ適用済み。オレンジのロゴ = オリジナル。
@@ -118,9 +118,32 @@ claude.orig         # オリジナル未修正版（自動バックアップ）
 }
 ```
 
-- **`apiKey` を設定**：ClawGod が `ANTHROPIC_API_KEY` として注入し、`~/.claude/settings.json` から隔離します。Anthropic / DeepSeek など OpenAI 互換ゲートウェイでも動作。`baseURL` が Anthropic 以外を指す場合、ゲートウェイ認証用に `ANTHROPIC_AUTH_TOKEN` のみを設定します。
+- **`apiKey` を設定**：ClawGod が `ANTHROPIC_API_KEY` として注入し、`~/.claude/settings.json` から隔離します。既定では Anthropic Messages 互換のエンドポイントが必要です。Chat Completions ゲートウェイには以下の設定を使用します。`baseURL` が Anthropic 以外を指す場合、ゲートウェイ認証用に `ANTHROPIC_AUTH_TOKEN` のみが設定されます。
 - **`apiKey` 未設定**：OAuth パス。一度 `claude auth login` を実行すれば、`~/.claude` 配下の subagents / skills / MCP はそのまま使えます。
-- **`effort`**：推論の強度を設定します。既存の `CLAUDE_CODE_EFFORT_LEVEL` が優先されます。`type: "grok"` または `"openai-compat"` では、Claude がカスタムモデルの effort を送信しなくても、プロキシが設定値を `reasoning_effort` として送信します。`low`、`medium`、`high`、`xhigh` はそのまま、`max` は `xhigh` に変換し、`auto` はパラメーターを省略して上流の既定値を使います。上流モデルが対応する値を選んでください。設定が空または未設定ならリクエストの effort を使い、リクエストにもなければ追加しません。
+- **`effort`**：推論の強度を設定します。既存の `CLAUDE_CODE_EFFORT_LEVEL` が優先されます。`protocol: "openai-chat"`、`type: "grok"` または `"openai-compat"` では、Claude がカスタムモデルの effort を送信しなくても、プロキシが設定値を `reasoning_effort` として送信します。`low`、`medium`、`high`、`xhigh` はそのまま、`max` は `xhigh` に変換し、`auto` はパラメーターを省略して上流の既定値を使います。上流モデルが対応する値を選んでください。設定が空または未設定ならリクエストの effort を使い、リクエストにもなければ追加しません。
+
+### OpenAI Chat Completions エンドポイント
+
+上流が `/v1/chat/completions` を提供する場合は、次のように設定します。
+
+```json
+{
+  "protocol": "openai-chat",
+  "apiKey": "sk-...",
+  "baseURL": "https://example.com/v1",
+  "model": "上流のモデル名",
+  "smallModel": "上流のモデル名"
+}
+```
+
+`baseURL` は API のベース URL（必要なら `/v1` を含む）です。完全な `/chat/completions` パスは指定しません。モデル名には上流が受け付ける ID を指定してください。変換プロキシはランチャーと同じプロセスで動作し、外部ゲートウェイや別サービスは不要です。`timeoutMs` は上流リクエストとストリームにも適用され、既存の `API_TIMEOUT_MS` が優先されます。
+
+- `protocol` を省略すると従来の動作を維持します。`type: "openai-compat"` と `type: "grok"` も引き続き利用でき、明示した `protocol` が優先されます。`protocol: "anthropic"` は Messages を直接使用します。Grok は `https://api.x.ai/v1` が既定で、設定ファイル・環境変数からのキー取得も維持します。他の Chat プロバイダーには API ベース URL とキーが必要です。
+- テキスト、system、ツール呼び出しと結果、ツール選択・並列実行の制御、ストリーミング、usage、base64/URL 画像に対応します。並列ツール引数は組み立て・検証後に内容ブロックを送信し、テキストは即時に配信します。上流から usage が届かない場合はゼロのままです。
+- base64 PDF は Chat Completions の `file` に変換するため、上流モデル/API のファイル対応が必要です。テキスト文書はテキストへ変換します。PDF URL、文書の引用、非テキストのツール結果、サーバーツール、構造化出力形式には明示的なエラーを返します。過去の Anthropic thinking/signature ブロックは省略され、モデル固有の推論機能は完全には変換できません。
+- `/v1/messages/count_tokens` はローカル推定で、課金される生成リクエストを追加しません。応答ヘッダー `x-clawgod-token-count: estimate` で推定と示します。テキストの UTF-8 バイト数 / 3 とメッセージ分の加算、画像ごとに 1600 token、PDF は復号後バイト数 / 3 を使います。モデルの tokenizer ではなく、PDF のバイト数もページ数とは異なるため、コンテキスト上限内に収まる保証はありません。
+- Chat の `stop` は自然終了と停止シーケンスを区別しないため、`end_turn` に変換します。`length`、`tool_calls`、`content_filter` はそれぞれ `max_tokens`、`tool_use`、`refusal` です。HTTP エラーの状態コードと `Retry-After` を保持し、壊れた・途中で切れたストリームはエラーになります。
+- `/v1/responses` と自動プロトコル検出は未対応です。`openai-chat` は Chat Completions エンドポイントにのみ使用してください。
 
 ### 機能トグル
 
@@ -184,12 +207,12 @@ claude update --no-upgrade        # インストール済みの Claude バージ
 
 **macOS / Linux:**
 ```bash
-curl -fsSL https://github.com/karlorz/clawgod/releases/latest/download/install.sh | bash
+curl -fsSL https://github.com/0Chencc/clawgod/releases/latest/download/install.sh | bash
 ```
 
 **Windows:**
 ```powershell
-irm https://github.com/karlorz/clawgod/releases/latest/download/install.ps1 | iex
+irm https://github.com/0Chencc/clawgod/releases/latest/download/install.ps1 | iex
 ```
 
 ClawGod を外して Anthropic 本来の `claude update`（独自に管理されたパスへ書き込み、私たちの launcher を上書きします）を使いたい場合は、先にアンインストールしてください：
@@ -202,43 +225,29 @@ bash ~/.clawgod/install.sh --uninstall
 
 **macOS / Linux:**
 ```bash
-curl -fsSL https://github.com/karlorz/clawgod/releases/latest/download/install.sh | bash -s -- --uninstall
+curl -fsSL https://github.com/0Chencc/clawgod/releases/latest/download/install.sh | bash -s -- --uninstall
 hash -r  # シェルキャッシュをリフレッシュ
 ```
 
 **Windows:**
 ```powershell
-irm https://github.com/karlorz/clawgod/releases/latest/download/install.ps1 -OutFile install.ps1; .\install.ps1 -Uninstall
+irm https://github.com/0Chencc/clawgod/releases/latest/download/install.ps1 -OutFile install.ps1; .\install.ps1 -Uninstall
 ```
 
 アンインストールは `claude.orig` を `claude` に戻し、`clawgod` エイリアスを削除します。
 
 > インストール・アンインストール後、コマンドがすぐに反映されない場合はターミナルを再起動するか `hash -r` を実行してください。
 
-## 上流 ClawGod からの移行
-
-以前 `0Chencc/clawgod` からインストールした場合は、**この fork のインストーラを一度再実行**してください。`claude update` とバージョン確認が上流を叩かなくなります：
-
-```bash
-curl -fsSL https://github.com/karlorz/clawgod/releases/latest/download/install.sh | bash
-```
-
-```powershell
-irm https://github.com/karlorz/clawgod/releases/latest/download/install.ps1 | iex
-```
-
-## Fork のリリース / CI 方針
-
-- **上流 tag を上書きしない**：`v1.6.1` 等はそのまま。本 fork の変更は `v1.6.1-0`、`v1.6.1-1`…  
-- **CI ロジックは上流と同一**（`release` / `compat-daily` / `cache-cleanup-weekly`）、対象リポジトリは本 fork のみ。  
-- **Claude 2.1.214 では compat-daily は未パッチ修正のため失敗が期待どおり**（上流と同種）。
-
 ## ライセンス
 
 GPL-3.0 — Anthropic とは無関係です。自己責任でご使用ください。
 
-[0Chencc/clawgod](https://github.com/0Chencc/clawgod)（GPL-3.0）から派生。本 fork のインストール／更新エンドポイントは **[karlorz/clawgod](https://github.com/karlorz/clawgod) のみ** です。
-
 ## Star History
 
-[![Star History Chart](https://api.star-history.com/chart?repos=karlorz/clawgod&type=date&legend=top-left)](https://www.star-history.com/?repos=karlorz%2Fclawgod&type=date&legend=top-left)
+<a href="https://www.star-history.com/?repos=0chencc%2Fclawgod&type=date&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=0chencc/clawgod&type=date&theme=dark&legend=top-left&sealed_token=ntGY6im49ymMeD9BXSi0OmH_kyhnnTL9pGyfm2rLYBTlzEcTeQf4o6RA6HqXhGVzdD6xXlk20KCFAyk4gWIpEda3TVEm4re4eJ0xoosRcUdYMui5B7Hp6e3YBUAr2tWmCZu2ZkRWVCOEdCOldK9S_h7Jn7NIjGEEgWywl2ZZOq7xpUpT4IkkXKKxGNJi" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=0chencc/clawgod&type=date&legend=top-left&sealed_token=ntGY6im49ymMeD9BXSi0OmH_kyhnnTL9pGyfm2rLYBTlzEcTeQf4o6RA6HqXhGVzdD6xXlk20KCFAyk4gWIpEda3TVEm4re4eJ0xoosRcUdYMui5B7Hp6e3YBUAr2tWmCZu2ZkRWVCOEdCOldK9S_h7Jn7NIjGEEgWywl2ZZOq7xpUpT4IkkXKKxGNJi" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=0chencc/clawgod&type=date&legend=top-left&sealed_token=ntGY6im49ymMeD9BXSi0OmH_kyhnnTL9pGyfm2rLYBTlzEcTeQf4o6RA6HqXhGVzdD6xXlk20KCFAyk4gWIpEda3TVEm4re4eJ0xoosRcUdYMui5B7Hp6e3YBUAr2tWmCZu2ZkRWVCOEdCOldK9S_h7Jn7NIjGEEgWywl2ZZOq7xpUpT4IkkXKKxGNJi" />
+ </picture>
+</a>
