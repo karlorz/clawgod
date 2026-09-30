@@ -64,7 +64,7 @@ streaming requests and custom model aliases that omit `output_config`:
 node src/shared/provider.test.mjs
 ```
 
-CI runs all five suites in the `build-sources` job, then loads the shim under Bun in the
+CI runs the JavaScript suites in the `build-sources` job, then loads the shim under Bun in the
 smoke jobs (`compat-daily.yml`).
 
 `src/ci/tui-smoke.py` tests an installed CLI in a POSIX PTY or Windows ConPTY.
@@ -75,7 +75,29 @@ Claude/Bun canary and Claude 2.1.272/Bun 1.4.2; the pinned case must also
 reproduce the missing CellSegmenter error with the shim disabled. Terminal
 logs, final screens and results are uploaded as CI artifacts.
 
+`src/shared/updater.test.mjs` checks that every Lean mode disables native
+background updates before loading Claude, including inherited false values.
+`src/windows/launchers.test.ps1` runs the installer's launcher section on real
+Windows files, including repeated installs, restored official executables,
+running binaries, deletion/rename locks, recovery, and original backups.
+Run them with Node and Windows PowerShell 5.1 respectively; CI runs both.
+
 ## Layout
+
+`source-backup.json` in the installed directory stores the complete clean
+JavaScript source (entry and graph chunks) after extraction/post-processing.
+The patcher reads it before applying patches, and writes runtime source only
+if no patch failed. Fresh installs replace the snapshot; `--no-upgrade` reuses
+it. Older installations without a complete snapshot fetch the exact installed
+version once to recover clean source. `--capture-clean-source` is an installer
+operation and must only run against freshly extracted, unpatched source.
+
+`node src/shared/source-backup.test.mjs` covers repeated patching, graph and
+legacy backups, version/file-set validation, revert, and failure without source
+writes, plus Unix migration and failure propagation. The Windows preflight is
+covered by `src/windows/source-recovery.test.ps1`. CI also repeats the actual
+Unix and Windows installers and compares their patch summaries with the first
+install.
 
 - `shared/` contains payloads embedded identically in both installers,
   including `cli.cjs` (the launcher/patcher bootstrap shared by Unix and
