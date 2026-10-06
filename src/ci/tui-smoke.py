@@ -69,9 +69,18 @@ class Terminal:
     def close(self):
         if os.name == "nt":
             # Include the console child if a future launcher adds a process.
-            subprocess.run(["taskkill", "/PID", str(self.process.pid), "/T", "/F"],
-                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
-            self.process.close(force=True)
+            try:
+                subprocess.run(["taskkill", "/PID", str(self.process.pid), "/T", "/F"],
+                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False, timeout=5)
+                deadline = time.monotonic() + 5
+                while self.process.pty.isalive():
+                    if time.monotonic() >= deadline:
+                        raise RuntimeError("Windows PTY process did not exit after taskkill")
+                    time.sleep(0.05)
+                self.process.close(force=True)
+            finally:
+                self.process.fileobj.close()
+                self.process._server.close()
         else:
             try:
                 os.killpg(self.process.pid, signal.SIGKILL)

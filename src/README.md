@@ -94,6 +94,23 @@ Claude/Bun canary and Claude 2.1.272/Bun 1.4.2; the pinned case must also
 reproduce the missing CellSegmenter error with the shim disabled. Terminal
 logs, final screens and results are uploaded as CI artifacts.
 
+`src/ci/test_tui_smoke.py` covers Windows ConPTY teardown, including delayed
+process exit after `taskkill`, already-exited processes, bounded cleanup, and
+propagation of real cleanup failures. It runs on any platform with the same
+Python dependencies; Windows CI runs it before the interactive smoke tests.
+On Windows it also repeatedly closes real ConPTY sessions and checks that an
+already-exited session releases its sockets; those cases skip elsewhere.
+
+```bash
+python -m unittest discover -s src/ci -p 'test_*.py' -v
+```
+
+Teardown waits up to five seconds for the underlying PTY process to exit before
+calling pywinpty's `close`. It polls `process.pty.isalive()` rather than the
+wrapper's `process.isalive()`, which marks the wrapper closed on exit and would
+skip closing its sockets. A live process after the deadline still fails CI;
+the sockets are released even if cleanup fails.
+
 `src/shared/updater.test.mjs` checks that every Lean mode disables native
 background updates before loading Claude, including inherited false values.
 `src/shared/startup-check.test.mjs` checks the installer's bounded startup
