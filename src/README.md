@@ -110,6 +110,8 @@ calling pywinpty's `close`. It polls `process.pty.isalive()` rather than the
 wrapper's `process.isalive()`, which marks the wrapper closed on exit and would
 skip closing its sockets. A live process after the deadline still fails CI;
 the sockets are released even if cleanup fails.
+Successful Windows cleanup is idempotent, so a second close does not target the
+old process ID again. Failed cleanup remains retryable.
 
 `src/shared/updater.test.mjs` checks that every Lean mode disables native
 background updates before loading Claude, including inherited false values.

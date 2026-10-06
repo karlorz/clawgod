@@ -23,6 +23,7 @@ MISSING_API = "has no Bun.ant.CellSegmenter"
 class Terminal:
     def __init__(self, command, cwd, env):
         self.output = queue.Queue()
+        self.closed = False
         if os.name == "nt":
             from winpty import PtyProcess
             from winpty.enums import Backend
@@ -68,6 +69,8 @@ class Terminal:
 
     def close(self):
         if os.name == "nt":
+            if self.closed:
+                return
             # Include the console child if a future launcher adds a process.
             try:
                 subprocess.run(["taskkill", "/PID", str(self.process.pid), "/T", "/F"],
@@ -81,6 +84,7 @@ class Terminal:
             finally:
                 self.process.fileobj.close()
                 self.process._server.close()
+            self.closed = True
         else:
             try:
                 os.killpg(self.process.pid, signal.SIGKILL)

@@ -17,6 +17,7 @@ spec.loader.exec_module(tui_smoke)
 class WindowsTerminalCloseTests(unittest.TestCase):
     def setUp(self):
         self.terminal = tui_smoke.Terminal.__new__(tui_smoke.Terminal)
+        self.terminal.closed = False
         self.process = Mock(pid=12345)
         self.process.pty.isalive.return_value = False
         self.terminal.process = self.process
@@ -59,6 +60,25 @@ class WindowsTerminalCloseTests(unittest.TestCase):
         self.terminal.close()
         self.process.close.assert_called_once_with(force=True)
 
+    def test_repeated_close_does_not_target_the_old_pid(self):
+        self.terminal.close()
+        self.terminal.close()
+        self.taskkill.assert_called_once()
+        self.process.close.assert_called_once_with(force=True)
+        self.process.fileobj.close.assert_called_once()
+        self.process._server.close.assert_called_once()
+
+    def test_failed_close_can_be_retried(self):
+        self.taskkill.side_effect = subprocess.TimeoutExpired("taskkill", 5)
+        with self.assertRaises(subprocess.TimeoutExpired):
+            self.terminal.close()
+        self.assertFalse(self.terminal.closed)
+        self.taskkill.side_effect = None
+        self.terminal.close()
+        self.assertTrue(self.terminal.closed)
+        self.assertEqual(self.taskkill.call_count, 2)
+        self.process.close.assert_called_once_with(force=True)
+
     def test_live_process_timeout_is_not_silenced(self):
         self.process.pty.isalive.return_value = True
         with patch.object(tui_smoke.time, "monotonic", side_effect=[10, 10, 15]), \
@@ -93,6 +113,7 @@ class WindowsTerminalCloseIntegrationTests(unittest.TestCase):
         return tui_smoke.Terminal([sys.executable, "-u", "-c", script], Path(directory), env)
 
     def assert_closed(self, terminal):
+        self.assertTrue(terminal.closed)
         self.assertFalse(terminal.process.pty.isalive())
         self.assertTrue(terminal.process.closed)
         self.assertEqual(terminal.process.fileobj.fileno(), -1)
