@@ -76,7 +76,7 @@ if [ "$UNINSTALL" = "1" ]; then
       info "Removed ClawGod alias ($DIR/clawgod)"
     fi
   done
-  rm -rf "$CLAWGOD_DIR/node_modules" "$CLAWGOD_DIR/vendor" "$CLAWGOD_DIR/bun-runtime" "$CLAWGOD_DIR/cli.original.js" "$CLAWGOD_DIR/cli.original.js.bak" "$CLAWGOD_DIR/cli.original.cjs" "$CLAWGOD_DIR/cli.original.cjs.bak" "$CLAWGOD_DIR/source-backup.json" "$CLAWGOD_DIR/cli.js" "$CLAWGOD_DIR/cli.cjs" "$CLAWGOD_DIR/patch.mjs" "$CLAWGOD_DIR/patch.js" "$CLAWGOD_DIR/extract-natives.mjs" "$CLAWGOD_DIR/post-process.mjs" "$CLAWGOD_DIR/repatch.mjs" "$CLAWGOD_DIR/startup-check.cjs" "$CLAWGOD_DIR/startup-check.log" "$CLAWGOD_DIR/openai-proxy.cjs" "$CLAWGOD_DIR/feature-gates.cjs" "$CLAWGOD_DIR/runtime-helpers.cjs" "$CLAWGOD_DIR/bun-ant-shim.cjs" "$CLAWGOD_DIR/clawgod-import" "$CLAWGOD_DIR/.source-version"
+  rm -rf "$CLAWGOD_DIR/node_modules" "$CLAWGOD_DIR/vendor" "$CLAWGOD_DIR/bun-runtime" "$CLAWGOD_DIR/cli.original.js" "$CLAWGOD_DIR/cli.original.js.bak" "$CLAWGOD_DIR/cli.original.cjs" "$CLAWGOD_DIR/cli.original.cjs.bak" "$CLAWGOD_DIR/source-backup.json" "$CLAWGOD_DIR/cli.js" "$CLAWGOD_DIR/cli.cjs" "$CLAWGOD_DIR/patch.mjs" "$CLAWGOD_DIR/patch.js" "$CLAWGOD_DIR/extract-natives.mjs" "$CLAWGOD_DIR/post-process.mjs" "$CLAWGOD_DIR/repatch.mjs" "$CLAWGOD_DIR/startup-check.cjs" "$CLAWGOD_DIR/startup-check.log" "$CLAWGOD_DIR/openai-proxy.cjs" "$CLAWGOD_DIR/feature-gates.cjs" "$CLAWGOD_DIR/runtime-helpers.cjs" "$CLAWGOD_DIR/bun-ant-shim.cjs" "$CLAWGOD_DIR/clawgod-import" "$CLAWGOD_DIR/claude.staged" "$CLAWGOD_DIR/.source-version"
   hash -r 2>/dev/null
   info "ClawGod uninstalled"
   echo ""
@@ -292,7 +292,46 @@ if [ -z "$NATIVE_BIN" ]; then
   exit 1
 fi
 
-# Write extractor to a temp file (used both for cli.js and .node modules)
+# ─── Snapshot existing installation for rollback on failure ──────────
+PREV_BACKUP_DIR=""
+ROLLBACK_FILES=(cli.original.cjs cli.original.cjs.bak cli.original.js .source-version
+  source-backup.json bunfs vendor pathmap.json extract-natives.mjs post-process.mjs
+  repatch.mjs openai-proxy.cjs feature-gates.cjs cli.cjs .clawgod-version
+  startup-check.cjs runtime-helpers.cjs bun-ant-shim.cjs patch.mjs)
+if [ -f "$CLAWGOD_DIR/cli.original.cjs" ] && [ -f "$CLAWGOD_DIR/.source-version" ]; then
+  PREV_BACKUP_DIR=$(mktemp -d "${TMPDIR:-/tmp}/clawgod-rollback-XXXXXX")
+  for f in "${ROLLBACK_FILES[@]}"; do
+    if [ -e "$CLAWGOD_DIR/$f" ]; then
+      cp -a "$CLAWGOD_DIR/$f" "$PREV_BACKUP_DIR/" || {
+        warn "Could not snapshot $f; installation was not changed."
+        rm -rf "$PREV_BACKUP_DIR"
+        exit 1
+      }
+    fi
+  done
+fi
+
+rollback_install() {
+  local status=$?
+  trap - EXIT
+  if [ "$status" -ne 0 ]; then
+    rm -f "$CLAWGOD_DIR/claude.staged"
+    if [ -n "$PREV_BACKUP_DIR" ]; then
+      dim "Rolling back to previous working installation ..."
+      for f in "${ROLLBACK_FILES[@]}"; do rm -rf "$CLAWGOD_DIR/$f"; done
+      if cp -a "$PREV_BACKUP_DIR"/. "$CLAWGOD_DIR/"; then
+        info "Restored previous working installation ($(cat "$CLAWGOD_DIR/.source-version"))."
+      else
+        warn "Rollback failed; backup kept at $PREV_BACKUP_DIR"
+        return
+      fi
+    fi
+  fi
+  [ -z "$PREV_BACKUP_DIR" ] || rm -rf "$PREV_BACKUP_DIR" || warn "Could not remove rollback snapshot at $PREV_BACKUP_DIR"
+}
+trap rollback_install EXIT
+
+# Write extractor (used both for cli.js and .node modules)
 cat > "$CLAWGOD_DIR/extract-natives.mjs" << 'EXTRACTOR_EOF'
 #!/usr/bin/env node
 /**
@@ -727,7 +766,8 @@ rm -rf "$CLAWGOD_DIR/vendor" "$CLAWGOD_DIR/bunfs" "$CLAWGOD_DIR/pathmap.json" \
   "$CLAWGOD_DIR/cli.original.js" 2>/dev/null
 
 dim "Extracting cli.js + modules from $(echo "$NATIVE_BIN_LABEL") ..."
-if ! node "$CLAWGOD_DIR/extract-natives.mjs" "$NATIVE_BIN" "$CLAWGOD_DIR" 2>&1 | while IFS= read -r line; do echo "  $line"; done; then
+node "$CLAWGOD_DIR/extract-natives.mjs" "$NATIVE_BIN" "$CLAWGOD_DIR" 2>&1 | while IFS= read -r line; do echo "  $line"; done
+if [ "${PIPESTATUS[0]}" -ne 0 ]; then
   err "Failed to extract from native binary"
   exit 1
 fi
@@ -838,10 +878,19 @@ if (isChunked) {
 }
 POSTPROC_EOF
 node "$CLAWGOD_DIR/post-process.mjs" 2>&1 | while IFS= read -r line; do echo "  $line"; done
+if [ "${PIPESTATUS[0]}" -ne 0 ]; then err "Post-process failed"; exit 1; fi
 [ -f "$CLAWGOD_DIR/cli.original.cjs" ] || { err "Post-process failed"; exit 1; }
 
 # Stamp the source version so the wrapper can detect drift on next launch
 echo "$NATIVE_BIN_LABEL" > "$CLAWGOD_DIR/.source-version"
+
+# Keep the binary we just extracted from. cli.cjs points process.execPath at
+# claude.orig, so everything Claude re-spawns from execPath (daemon, background
+# and forked sessions) runs that file, not the patched bundle. The launcher
+# section below swaps it in once it knows where claude lives.
+if [ -f "$NATIVE_BIN" ]; then
+  mv -f "$NATIVE_BIN" "$CLAWGOD_DIR/claude.staged"
+fi
 
 # If we pulled the binary from npm into a tmpdir, clean it up now —
 # extraction is done, drift detection only consults ~/.local/share/claude/versions/.
@@ -852,6 +901,10 @@ fi
 info "cli.original.cjs ready ($NATIVE_BIN_LABEL)"
 
 fi  # end --no-upgrade skip
+
+# A failed earlier upgrade may have left a newer native binary staged.
+# Re-patching the installed source must not install that different version.
+if [ "$NO_UPGRADE" = "1" ]; then rm -f "$CLAWGOD_DIR/claude.staged"; fi
 
 # ─── Write re-patch helper (used by wrapper on version drift) ─────────
 
@@ -2682,10 +2735,13 @@ const patches = [
     // v2.1.280+: if(Fin()&&(n==="claude-opus-4-6"||…))return!1;
     //   Fin() now contains the provider check. Keep the original condition
     //   behind the feature gate so disabling the patch restores upstream.
+    // v2.1.293+: if(jDn()&&(n==="claude-opus-4-6"||n==="claude-sonnet-4-6"||n.includes("haiku")&&n!=="claude-haiku-5-5"))return!1;
+    //   upstream added `&&n!=="claude-haiku-5-5"` exemption to the haiku check.
+    //   Relaxed to [^;]*? to tolerate model exclusion variants without breaking on future additions.
     id: 'auto-mode-inline-gate',
     toggleable: true,
     name: 'Auto-mode unlock for third-party API (inline gate)',
-    pattern: /if\((?:([\w$]+)!=="firstParty"&&(?:\1!=="anthropicAws"|![\w$]+\(\1\))[^;]*|[\w$]+\(\)&&\([\w$]+==="claude-opus-4-6"\|\|[\w$]+==="claude-sonnet-4-6"\|\|[\w$]+\.includes\("haiku"\)\))\)return!1;/g,
+    pattern: /if\((?:([\w$]+)!=="firstParty"&&(?:\1!=="anthropicAws"|![\w$]+\(\1\))[^;]*|[\w$]+\(\)&&\([\w$]+==="claude-opus-4-6"\|\|[\w$]+==="claude-sonnet-4-6"\|\|[\w$]+\.includes\("haiku"\)[^;]*?\))\)return!1;/g,
     replacer: (m) => `if(globalThis.__clawgodPatches?.[${JSON.stringify('auto-mode-inline-gate')}]===!1&&` + m.slice(3, -10) + `)return!1;`,
     sentinel: '!=="firstParty"&&',
   },
@@ -3381,6 +3437,14 @@ node "$CLAWGOD_DIR/patch.mjs" 2>&1 | while IFS= read -r line; do echo "  $line";
 patch_status=${PIPESTATUS[0]}
 if [ "$patch_status" -ne 0 ]; then
   warn "Patching failed (node exit $patch_status). Installation aborted."
+  if [ -z "$PREV_BACKUP_DIR" ]; then
+    warn "No previous working installation found to roll back."
+  fi
+  warn ""
+  warn "The new Claude Code build (${NATIVE_BIN_LABEL:-unknown}) is not yet supported by this ClawGod release."
+  warn "To install or roll back to a known compatible version, run:"
+  warn "  curl -fsSL https://github.com/0Chencc/clawgod/releases/latest/download/install.sh | bash -s -- --version <version>"
+  warn "(Note: 'claude update --version' will fail on unpatched Claude Code with \"unknown option '--version'\")"
   exit "$patch_status"
 fi
 
@@ -3548,6 +3612,7 @@ if [ "$sanity_rc" -ne 0 ]; then
   exit "$sanity_rc"
 fi
 info "Bun loads cli.original.cjs"
+if [ "$NO_UPGRADE" != "1" ]; then rollback_install; fi
 
 # ─── Replace claude command ───────────────────────────
 
@@ -3623,6 +3688,21 @@ export HERDR_AGENT=\"\${HERDR_AGENT:-claude}\"
 # process-name matchers) identify clawgod lanes; bun does not rewrite argv[0].
 exec -a claude \"\$BUN_BIN\" \"\$CLAWGOD_CLI\" \"\$@\""
 
+
+# Refresh claude.orig from the binary this run extracted. The backup below is
+# only taken once (and on native installs is a symlink into versions/, which
+# no longer moves because the background updater is off), so without this it
+# stays at the first-install version while cli.original.cjs moves on. Sessions
+# spawned from process.execPath then report the old version to the API, which
+# rejects models that need a newer client.
+# rm first: never write through a symlink into the official versions/ dir.
+NATIVE_STAGED="$CLAWGOD_DIR/claude.staged"
+if [ -f "$NATIVE_STAGED" ]; then
+  rm -f "$CLAUDE_BIN.orig"
+  mv -f "$NATIVE_STAGED" "$CLAUDE_BIN.orig"
+  chmod +x "$CLAUDE_BIN.orig"
+  info "Native binary refreshed → claude.orig"
+fi
 
 # Back up original claude (only once)
 if [ ! -e "$CLAUDE_BIN.orig" ]; then
