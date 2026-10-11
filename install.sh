@@ -9,13 +9,14 @@ set -e
 #  用法:
 #    curl -fsSL https://github.com/karlorz/clawgod/releases/latest/download/install.sh | bash
 #    # 或
-#    bash install.sh [--version 2.1.89] [--no-upgrade]
+#    bash install.sh [--version 2.1.89] [--no-upgrade] [--tolerate-stale]
 # ─────────────────────────────────────────────────────────
 
 CLAWGOD_DIR="$HOME/.clawgod"
 BIN_DIR="$HOME/.local/bin"
 VERSION="${CLAWGOD_VERSION:-latest}"
 NO_UPGRADE="${CLAWGOD_NO_UPGRADE:-}"
+TOLERATE_STALE="${CLAWGOD_TOLERATE_STALE:-}"
 LEAN_OFF="${CLAWGOD_LEAN_OFF:-}"
 LEAN_ON="${CLAWGOD_LEAN_ON:-}"
 LEAN_MAX="${CLAWGOD_LEAN_MAX:-}"
@@ -32,6 +33,7 @@ while [[ $# -gt 0 ]]; do
   case $1 in
     --version) VERSION="$2"; shift 2 ;;
     --no-upgrade) NO_UPGRADE=1; shift ;;
+    --tolerate-stale) TOLERATE_STALE=1; shift ;;
     --uninstall) UNINSTALL=1; shift ;;
     --lean-off) LEAN_OFF=1; shift ;;
     --lean-on) LEAN_ON=1; shift ;;
@@ -784,11 +786,12 @@ fi
 
 dim "Rewriting bunfs paths and IIFE invocation ..."
 cat > "$CLAWGOD_DIR/post-process.mjs" << 'POSTPROC_EOF'
-import { readFileSync, writeFileSync, unlinkSync, existsSync, readdirSync } from 'fs';
+import { readFileSync, writeFileSync, unlinkSync, existsSync, readdirSync, realpathSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 
-const here = dirname(fileURLToPath(import.meta.url));
+// Generate paths in the OS's canonical form, including Windows 8.3 aliases.
+const here = realpathSync.native(dirname(fileURLToPath(import.meta.url)));
 const src = `${here}/cli.original.js`;
 const dst = `${here}/cli.original.cjs`;
 const pathMapFile = `${here}/pathmap.json`;
@@ -809,6 +812,25 @@ function fixFileURLs(c) {
   return c.replace(
     /[\w$]+\.fileURLToPath\("file:\/\/\/home\/runner\/work\/claude-cli-internal\/claude-cli-internal\/[^"]*"\)/g,
     () => '__filename',
+  );
+}
+
+// Embedded text requires return strings in the native bundle. Bun's disk
+// loader returns a module namespace, so read extracted text assets as UTF-8.
+function fixTextRequires(c) {
+  const textRoot = JSON.stringify(join(here, 'bunfs'));
+  return c.replace(/\b([\w$]+)=import\.meta\.require(?=[,;])/g, (_match, name) =>
+    `${name} = (id) => {
+      if (/\\.(?:txt|md)$/.test(id)) {
+        const fs = import.meta.require('node:fs');
+        const path = import.meta.require('node:path');
+        const relative = path.relative(fs.realpathSync(${textRoot}), fs.realpathSync(id));
+        if (relative !== '..' && !relative.startsWith('..' + path.sep) && !path.isAbsolute(relative)) {
+          return fs.readFileSync(id, 'utf8');
+        }
+      }
+      return import.meta.require(id);
+    }`,
   );
 }
 
@@ -839,6 +861,7 @@ if (isChunked) {
   code = stripPragma(code);
   code = rewriteGraph(code);
   code = fixFileURLs(code);
+  code = fixTextRequires(code);
   writeFileSync(dst, code);
   unlinkSync(src);
 
@@ -852,6 +875,7 @@ if (isChunked) {
     fc = stripPragma(fc);
     fc = rewriteGraph(fc);
     fc = fixFileURLs(fc);
+    fc = fixTextRequires(fc);
     writeFileSync(fp, fc);
     n++;
   }
@@ -2797,6 +2821,7 @@ const patches = [
         `const _vi=_ua.indexOf("--version");` +
         `if(_vi>=0&&_ua[_vi+1])process.env.CLAWGOD_VERSION=_ua[_vi+1];` +
         `if(_ua.includes("--no-upgrade"))process.env.CLAWGOD_NO_UPGRADE="1";` +
+        `if(_ua.includes("--tolerate-stale"))process.env.CLAWGOD_TOLERATE_STALE="1";` +
         `if(_ua.includes("--lean-off"))process.env.CLAWGOD_LEAN_OFF="1";` +
         `if(_ua.includes("--lean-on"))process.env.CLAWGOD_LEAN_ON="1";` +
         `if(_ua.includes("--lean-max"))process.env.CLAWGOD_LEAN_MAX="1";` +
@@ -3155,6 +3180,11 @@ const verify = args.includes('--verify');
 const revert = args.includes('--revert');
 const dumpFeatures = args.includes('--dump-features');
 const captureCleanSource = args.includes('--capture-clean-source');
+// Opt-in: report a stale patch and keep going instead of aborting the whole
+// install. A single drifted regex still fails the run by default, because
+// "patched minus one" is only safe when the caller asked for it: the skipped
+// patch leaves upstream behavior in place for its own gate. See issue #224.
+const tolerateStale = args.includes('--tolerate-stale');
 
 // Build-time export: `patch.mjs --dump-features` prints the inverted
 // registry (patch id → owning feature ids) as JSON and exits. build.js
@@ -3294,7 +3324,7 @@ if (revert) {
 console.log(`\n${'═'.repeat(55)}`);
 console.log(`  ClawGod (universal)`);
 console.log(`  Target: cli.original.cjs (v${version}) ${isGraph ? `[graph: ${Object.keys(files).length} files]` : ''}`);
-console.log(`  Mode: ${dryRun ? 'DRY RUN' : verify ? 'VERIFY' : 'APPLY'}`);
+console.log(`  Mode: ${dryRun ? 'DRY RUN' : verify ? 'VERIFY' : 'APPLY'}${tolerateStale ? ' (stale tolerated)' : ''}`);
 console.log(`${'═'.repeat(55)}\n`);
 
 // unified search: gather all matches of a pattern across every loaded file.
@@ -3314,7 +3344,8 @@ function collectMatches(p) {
   return out;
 }
 
-let applied = 0, skipped = 0, failed = 0;
+let applied = 0, skipped = 0, failed = 0, tolerated = 0;
+const toleratedNames = [];
 
 for (const p of patches) {
   const fileMatches = collectMatches(p);
@@ -3347,8 +3378,15 @@ for (const p of patches) {
       const sentinels = Array.isArray(p.sentinel) ? p.sentinel : [p.sentinel];
       const stillPresent = sentinels.filter((s) => Object.values(files).some((c) => c.includes(s)));
       if (stillPresent.length > 0) {
-        console.log(`  ❌ ${p.name} — regex stale, sentinel still in source: ${stillPresent.map((s) => JSON.stringify(s)).join(', ')}`);
-        failed++;
+        const detail = stillPresent.map((s) => JSON.stringify(s)).join(', ');
+        if (tolerateStale) {
+          console.log(`  ⚠️  ${p.name} — regex stale, sentinel still in source: ${detail} (tolerated)`);
+          tolerated++;
+          toleratedNames.push(p.name);
+        } else {
+          console.log(`  ❌ ${p.name} — regex stale, sentinel still in source: ${detail}`);
+          failed++;
+        }
         continue;
       }
       console.log(`  ✅ ${p.name} (already applied, sentinel absent)`);
@@ -3402,11 +3440,20 @@ for (const p of patches) {
 }
 
 console.log(`\n${'─'.repeat(55)}`);
-console.log(`  Result: ${applied} applied, ${skipped} skipped, ${failed} failed`);
+console.log(`  Result: ${applied} applied, ${skipped} skipped, ${failed} failed${tolerated > 0 ? `, ${tolerated} tolerated` : ''}`);
+if (tolerated > 0) {
+  console.log(`  Tolerated (skipped, upstream behavior kept): ${toleratedNames.join('; ')}`);
+}
 
 if (failed > 0) {
   console.error('Patching failed; source files were not changed.');
   process.exit(1);
+}
+
+if (tolerated > 0) {
+  console.warn('  ⚠️  --tolerate-stale: the patches listed above were not applied, so their');
+  console.warn('     upstream gates stay in force. Re-run without the flag once the patcher');
+  console.warn('     has been updated for this Claude Code build.');
 }
 
 if (!dryRun && !verify && applied > 0) {
@@ -3433,7 +3480,9 @@ if [ "$NO_UPGRADE" != "1" ]; then
   node "$CLAWGOD_DIR/patch.mjs" --capture-clean-source
 fi
 dim "Applying patches ..."
-node "$CLAWGOD_DIR/patch.mjs" 2>&1 | while IFS= read -r line; do echo "  $line"; done
+patch_args=()
+if [ "$TOLERATE_STALE" = "1" ]; then patch_args+=(--tolerate-stale); fi
+node "$CLAWGOD_DIR/patch.mjs" "${patch_args[@]}" 2>&1 | while IFS= read -r line; do echo "  $line"; done
 patch_status=${PIPESTATUS[0]}
 if [ "$patch_status" -ne 0 ]; then
   warn "Patching failed (node exit $patch_status). Installation aborted."
@@ -3442,6 +3491,8 @@ if [ "$patch_status" -ne 0 ]; then
   fi
   warn ""
   warn "The new Claude Code build (${NATIVE_BIN_LABEL:-unknown}) is not yet supported by this ClawGod release."
+  warn "If the log says 'regex stale', retry with --tolerate-stale to keep the affected gates upstream:"
+  warn "  curl -fsSL https://raw.githubusercontent.com/0Chencc/clawgod/main/install.sh | bash -s -- --tolerate-stale"
   warn "To install or roll back to a known compatible version, run:"
   warn "  curl -fsSL https://github.com/0Chencc/clawgod/releases/latest/download/install.sh | bash -s -- --version <version>"
   warn "(Note: 'claude update --version' will fail on unpatched Claude Code with \"unknown option '--version'\")"
@@ -3794,6 +3845,7 @@ dim "  Just run it as usual — pulls latest Anthropic release + re-patches"
 dim "  in one step. Extra options:"
 dim "    claude update --version 2.1.180   (install a specific version)"
 dim "    claude update --no-upgrade        (re-patch the installed version)"
+dim "    claude update --tolerate-stale    (continue past stale patches; affected gates stay upstream)"
 dim "  To leave clawgod and use vanilla update:"
 dim "    bash ~/.clawgod/install.sh --uninstall"
 echo ""
