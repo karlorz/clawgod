@@ -148,6 +148,15 @@ old process ID again. Failed cleanup remains retryable.
 
 `src/shared/updater.test.mjs` checks that every Lean mode disables native
 background updates before loading Claude, including inherited false values.
+`src/shared/self-update.test.mjs` executes the update handlers generated for
+legacy bundles and chunk graphs. It covers aliases, option forwarding, spawn
+errors, signals, missing exit status, and installer exit codes. Real Bash tests
+verify that failed, partial, and empty downloads never execute an installer,
+including temporary-file cleanup and paths with spaces/non-ASCII text. Windows
+CI executes the encoded payload under PowerShell 5.1 with offline download
+fixtures, including proxy selection and terminating download/installer errors.
+Run it with `node src/shared/self-update.test.mjs`.
+
 `src/shared/startup-check.test.mjs` checks the installer's bounded startup
 probe, version output, errors, closed stdin, paths with spaces/non-ASCII text,
 process-tree timeout cleanup, logs, and standalone version-query side effects.

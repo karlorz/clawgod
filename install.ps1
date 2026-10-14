@@ -9462,11 +9462,27 @@ const patches = [
       // returns string in both versions. -EncodedCommand bypasses CLI
       // arg-quoting; payload must be UTF-16LE base64.
       const psScript =
+        "$ErrorActionPreference='Stop';try{" +
         "$p=if($env:HTTPS_PROXY){$env:HTTPS_PROXY}elseif($env:HTTP_PROXY){$env:HTTP_PROXY}else{$null};" +
         // Keep in sync with CLAWGOD_GITHUB_REPO in install.sh (quoted HEREDOC).
         "$u='https://github.com/karlorz/clawgod/releases/latest/download/install.ps1';" +
-        "if($p){iex(irm -Proxy $p $u)}else{iex(irm $u)}";
+        "$installer=if($p){irm -Proxy $p $u}else{irm $u};" +
+        "if([string]::IsNullOrWhiteSpace($installer)){throw 'Empty installer response'};" +
+        "iex $installer" +
+        "}catch{[Console]::Error.WriteLine('[clawgod] Installer download or execution failed.');exit 1}";
       const psB64 = Buffer.from(psScript, 'utf16le').toString('base64');
+      // Do not execute a partial response or let the final shell hide curl's
+      // failure. Download first, then execute, preserving the installer's exit.
+      const shScript = [
+        'set -e',
+        '_cg_update_dir=$(mktemp -d "${TMPDIR:-/tmp}/clawgod-update.XXXXXX")',
+        'trap \'_cg_update_status=$?; trap - EXIT; rm -rf -- "$_cg_update_dir"; exit "$_cg_update_status"\' EXIT',
+        'trap \'exit 130\' INT',
+        'trap \'exit 143\' TERM',
+        'curl -fsSL -o "$_cg_update_dir/install.sh" https://github.com/karlorz/clawgod/releases/latest/download/install.sh',
+        'if [ ! -s "$_cg_update_dir/install.sh" ]; then printf "%s\\n" "[clawgod] Downloaded installer is empty." >&2; exit 1; fi',
+        'bash "$_cg_update_dir/install.sh"',
+      ].join('\n');
       return (
         chain + '.allowUnknownOption()' + action +
         `const _ui=process.argv.findIndex(a=>a==="update"||a==="upgrade");` +
@@ -9480,9 +9496,12 @@ const patches = [
         `if(_ua.includes("--lean-max"))process.env.CLAWGOD_LEAN_MAX="1";` +
         `process.stderr.write("[clawgod] 'claude update' is handled by clawgod self-update.\\n[clawgod] To leave clawgod and use vanilla update: bash ~/.clawgod/install.sh --uninstall\\n[clawgod] Continuing now\\u2026\\n");` +
         `const _w=process.platform==='win32';` +
-        `const _c=_w?['powershell','-NoProfile','-EncodedCommand','${psB64}']:['bash','-c','curl -fsSL https://github.com/karlorz/clawgod/releases/latest/download/install.sh | bash'];` +
+        `const _c=_w?['powershell','-NoProfile','-EncodedCommand','${psB64}']:['bash','-c',${JSON.stringify(shScript)}];` +
         `const _r=require('child_process').spawnSync(_c[0],_c.slice(1),{stdio:'inherit',env:process.env});` +
-        `process.exit(_r.status||0);`
+        `if(_r.error){process.stderr.write("[clawgod] Could not start updater.\\n");process.exit(1);}` +
+        `if(_r.signal){process.stderr.write("[clawgod] Updater terminated by signal "+_r.signal+".\\n");const _sn=require('os').constants.signals[_r.signal];process.exit(_sn?128+_sn:1);}` +
+        `if(!Number.isInteger(_r.status)||_r.status<0){process.stderr.write("[clawgod] Updater failed without an exit status.\\n");process.exit(1);}` +
+        `process.exit(_r.status);`
       );
     },
     sentinel: '.command("update").alias("upgrade")',

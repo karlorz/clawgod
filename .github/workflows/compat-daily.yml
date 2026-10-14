@@ -71,6 +71,9 @@ jobs:
       - name: Run updater environment regression tests
         run: node src/shared/updater.test.mjs
 
+      - name: Run self-update failure regression tests
+        run: node src/shared/self-update.test.mjs
+
       - name: Run native binary refresh regression tests
         run: node src/shared/native-refresh.test.mjs
 
@@ -126,6 +129,9 @@ jobs:
         with:
           node-version: 24
           package-manager-cache: false
+
+      - name: Test self-update handlers and real Bash failure paths
+        run: node src/shared/self-update.test.mjs
 
       - name: Set up Bun (canary)
         # Anthropic ships claude-code with bleeding-edge Bun (e.g. 1.3.14
@@ -524,6 +530,12 @@ jobs:
         with:
           node-version: 24
           package-manager-cache: false
+
+      - name: Test self-update handlers and real PowerShell failure paths
+        shell: powershell
+        run: |
+          node src/shared/self-update.test.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Set up Bun
         uses: oven-sh/setup-bun@v2
