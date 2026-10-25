@@ -8751,11 +8751,13 @@ export const AST_PATCH_IDS = [
   'user-type-ant', 'bun-standalone-executable', 'growthbook-env-overrides-graph',
   'computer-use-default', 'ultraplan', 'voice-mode',
   'geo-stego-date', 'remote-settings-off', 'wiggly-dove',
+  'tool-result-pairing-recovery',
 ];
 
 const anchors = ['external', 'isStandaloneExecutable', 'environmentOverridesParsed',
   'pixelValidation', 'ultraplan', 'tengu_amber_quartz_disabled', 's date is ',
-  'Remote settings:', 'remote-settings.json', 'tengu_wiggly_dove'];
+  'Remote settings:', 'remote-settings.json', 'tengu_wiggly_dove',
+  '[Tool result missing due to internal error]'];
 const gate = id => `globalThis.__clawgodPatches?.[${JSON.stringify(id)}]!==!1`;
 const literal = (node, value) => node?.type === 'Literal' && node.value === value;
 const propertyName = node => node.computed
@@ -8788,6 +8790,114 @@ function walk(root, visit) {
     }
   }
 }
+// Iterative traversal bounded to the current function scope.
+// Stops descending at nested function boundaries to prevent outer scopes from
+// claiming inner statements or creating overlapping edits.
+function walkScope(root, visit) {
+  const pending = [root];
+  while (pending.length) {
+    const node = pending.pop();
+    visit(node);
+    for (const value of Object.values(node)) {
+      if (!value) continue;
+      if (value.type) {
+        if (['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression'].includes(value.type)) {
+          visit(value);
+        } else {
+          pending.push(value);
+        }
+      } else if (Array.isArray(value)) {
+        for (const child of value) {
+          if (!child?.type) continue;
+          if (['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression'].includes(child.type)) {
+            visit(child);
+          } else {
+            pending.push(child);
+          }
+        }
+      }
+    }
+  }
+}
+
+function pairingScopeResolver(tree, sentinel) {
+  const scopes = new WeakMap(), writes = [];
+  const names = pattern => {
+    const pending = [pattern], result = [];
+    while (pending.length) {
+      const node = pending.pop();
+      if (!node) continue;
+      if (node.type === 'Identifier') result.push(node.name);
+      if (node.type === 'RestElement') pending.push(node.argument);
+      if (node.type === 'AssignmentPattern') pending.push(node.left);
+      if (node.type === 'ArrayPattern') pending.push(...node.elements);
+      if (node.type === 'ObjectPattern') pending.push(...node.properties.map(p => p.type === 'RestElement' ? p.argument : p.value));
+    }
+    return result;
+  };
+  const declare = (scope, pattern, value) => {
+    for (const name of names(pattern)) {
+      if (!scope.bindings.has(name)) scope.bindings.set(name, []);
+      if (value !== null) scope.bindings.get(name).push(value);
+    }
+  };
+  const resolve = (scope, name) => {
+    for (; scope; scope = scope.parent) {
+      if (scope.bindings.has(name)) return scope.bindings.get(name);
+    }
+  };
+  const pending = [{ node: tree, scope: null }];
+  while (pending.length) {
+    let { node, scope } = pending.pop();
+    const fn = ['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression'].includes(node.type);
+    const cls = node.type === 'ClassDeclaration' || node.type === 'ClassExpression';
+    if (node.type === 'FunctionDeclaration' || node.type === 'ClassDeclaration') declare(scope, node.id);
+    if (fn || cls || ['Program', 'BlockStatement', 'StaticBlock', 'CatchClause', 'ForStatement', 'ForInStatement', 'ForOfStatement', 'SwitchStatement'].includes(node.type)) {
+      scope = { parent: scope, bindings: new Map(), vars: scope?.vars };
+      if (fn || node.type === 'Program' || node.type === 'StaticBlock') scope.vars = scope;
+      scopes.set(node, scope);
+    }
+    if (fn) {
+      if (node.id) declare(scope, node.id);
+      for (const param of node.params) declare(scope, param);
+    }
+    if (cls && node.id) declare(scope, node.id);
+    if (node.type === 'CatchClause') declare(scope, node.param);
+    if (node.type === 'ImportDeclaration') for (const specifier of node.specifiers) declare(scope, specifier.local);
+    if (node.type === 'VariableDeclaration') {
+      for (const declaration of node.declarations) {
+        // Destructuring does not bind the whole initializer to each name.
+        const value = declaration.id.type === 'Identifier' ? declaration.init : undefined;
+        declare(node.kind === 'var' ? scope.vars : scope, declaration.id, value);
+      }
+    }
+    if (node.type === 'AssignmentExpression' || node.type === 'UpdateExpression') {
+      writes.push({ scope, pattern: node.left ?? node.argument,
+        value: node.operator === '=' && node.left.type === 'Identifier' ? node.right : undefined });
+    }
+    if (node.type === 'ForInStatement' || node.type === 'ForOfStatement') {
+      const patterns = node.left.type === 'VariableDeclaration' ? node.left.declarations.map(d => d.id) : [node.left];
+      for (const pattern of patterns) writes.push({ scope, pattern, value: undefined });
+    }
+    for (const value of Object.values(node)) {
+      if (value?.type) pending.push({ node: value, scope });
+      else if (Array.isArray(value)) for (const child of value) if (child?.type) pending.push({ node: child, scope });
+    }
+  }
+  // Resolve writes after declarations so hoisting and later declarations shadow correctly.
+  for (const { scope, pattern, value } of writes) {
+    for (const name of names(pattern)) resolve(scope, name)?.push(value);
+  }
+  return (expr, callback, owner) => {
+    const history = owner.params[0].name;
+    if (resolve(scopes.get(callback).parent, history) !== scopes.get(owner).bindings.get(history)) return false;
+    if (literal(expr, sentinel)) return true;
+    if (expr?.type !== 'Identifier') return false;
+    const values = resolve(scopes.get(callback.body) ?? scopes.get(callback), expr.name);
+    return !!values?.length && values.every(value => literal(value, sentinel));
+  };
+}
+
 
 function hasGate(node, id) {
   let found = false;
@@ -8840,6 +8950,9 @@ export function scanAstPatches(code) {
   // local to one chunk: cross-chunk imports are not a stable contract.
   const functions = new Map();
   const wigglyLiterals = new Set(), wigglyHandled = new Set();
+  let pairingHandled = false;
+  const MISSING_SENTINEL = '[Tool result missing due to internal error]';
+  const resolvesToMissingSentinel = code.includes(MISSING_SENTINEL) ? pairingScopeResolver(tree, MISSING_SENTINEL) : () => false;
   walk(tree, node => {
     if (node.type === 'FunctionDeclaration' && node.id?.type === 'Identifier') {
       functions.set(node.id.name, node);
@@ -8974,6 +9087,87 @@ export function scanAstPatches(code) {
       }
     }
 
+    if (['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression'].includes(node.type) &&
+        node.params.length > 0 && node.params[0].type === 'Identifier') {
+      const historyParam = node.params[0].name;
+      let isHistoryArray = false;
+      walkScope(node.body, inner => {
+        if (inner.type === 'MemberExpression' && inner.object?.type === 'Identifier' && inner.object.name === historyParam) {
+          if (inner.property?.name === 'length' || inner.computed) isHistoryArray = true;
+        }
+      });
+      if (isHistoryArray) {
+        const id = 'tool-result-pairing-recovery';
+        if (hasGate(node, id)) {
+          results[id].patched = true;
+          pairingHandled = true;
+        } else {
+          walkScope(node.body, inner => {
+            if (inner.type === 'CallExpression' && inner.callee?.type === 'MemberExpression' &&
+                inner.callee.property?.name === 'map' && inner.arguments.length >= 1) {
+              const cb = inner.arguments[0];
+              if (!['ArrowFunctionExpression', 'FunctionExpression'].includes(cb?.type) || cb.async || cb.generator) return;
+              const idParam = cb.params[0];
+              if (cb.params.length !== 1 || idParam?.type !== 'Identifier') return;
+              const returnObj = cb.body.type === 'ObjectExpression' ? cb.body
+                : cb.body.type === 'BlockStatement' && cb.body.body.length === 1 && cb.body.body[0].type === 'ReturnStatement' ? cb.body.body[0].argument
+                : null;
+              if (returnObj?.type !== 'ObjectExpression') return;
+              const props = returnObj.properties.filter(p => p.type === 'Property');
+              if (props.length !== 4 || returnObj.properties.length !== 4 ||
+                  props.some(p => p.kind !== 'init' || p.method || (p.computed && p.key.type !== 'Literal')) ||
+                  new Set(props.map(propertyName)).size !== 4) return;
+              const hasType = props.some(p => propertyName(p) === 'type' && literal(p.value, 'tool_result'));
+              const hasToolUseId = props.some(p => propertyName(p) === 'tool_use_id' && p.value?.type === 'Identifier' && p.value.name === idParam.name);
+              const hasIsError = props.some(p => propertyName(p) === 'is_error' && boolean(p.value, true));
+              const contentProp = props.find(p => propertyName(p) === 'content');
+              if (hasType && hasToolUseId && hasIsError && contentProp && resolvesToMissingSentinel(contentProp.value, cb, node)) {
+                // Collect all identifiers across the entire function tree to guarantee no variable shadowing or collisions
+                const usedNames = new Set();
+                walk(node, n => {
+                  if (n.type === 'Identifier') usedNames.add(n.name);
+                });
+                const freshId = base => {
+                  let name = base;
+                  let counter = 1;
+                  while (usedNames.has(name)) {
+                    name = `${base}${counter++}`;
+                  }
+                  usedNames.add(name);
+                  return name;
+                };
+                const pVar = freshId('_p');
+                const mVar = freshId('_m');
+                const bVar = freshId('_b');
+                const idVar = freshId('_id');
+                const mapTarget = code.slice(inner.callee.object.start, inner.callee.object.end);
+                const contentExpr = code.slice(contentProp.value.start, contentProp.value.end);
+                const replacement =
+                  `${mapTarget}.map((${idVar})=>{` +
+                  `let ${pVar};` +
+                  `if(${gate(id)}){` +
+                  `for(let ${mVar} of ${historyParam}){` +
+                  `if(${mVar}?.message?.content&&Array.isArray(${mVar}.message.content)){` +
+                  `for(let ${bVar} of ${mVar}.message.content){` +
+                  `if(${bVar}?.type==="tool_result"&&${bVar}.tool_use_id===${idVar}&&${bVar}.content!==${contentExpr}){` +
+                  `${pVar}=${bVar};break;` +
+                  `}` +
+                  `}` +
+                  `}` +
+                  `if(${pVar})break;` +
+                  `}` +
+                  `}` +
+                  `return ${pVar}?{...${pVar}}:{type:"tool_result",tool_use_id:${idVar},content:${contentExpr},is_error:!0}` +
+                  `})`;
+                edit(id, inner, replacement);
+                pairingHandled = true;
+              }
+            }
+          });
+        }
+      }
+    }
+
     if ((node.type === 'MethodDefinition' || node.type === 'Property') &&
         propertyName(node) === 'getEnvironmentOverrides' && node.value?.body?.type === 'BlockStatement') {
       const statements = node.value.body.body;
@@ -8997,6 +9191,10 @@ export function scanAstPatches(code) {
   if ([...wigglyLiterals].some(start => !wigglyHandled.has(start))) {
     results['wiggly-dove'].present = true;
     results['wiggly-dove'].matches = [];
+  }
+  if (code.includes('[Tool result missing due to internal error]') && !pairingHandled) {
+    results['tool-result-pairing-recovery'].present = true;
+    results['tool-result-pairing-recovery'].matches = [];
   }
   return results;
 }
@@ -9809,6 +10007,28 @@ const patches = [
     id: 'remote-settings-off',
     toggleable: true,
     name: 'Ignore enterprise-managed remote settings',
+    ast: true,
+  },
+
+  {
+    // Recover orphaned tool_result entries from message history.
+    // In DRn(e, n) / oyn(e, n) (ensureToolResultPairing), when assistant messages contain tool_use
+    // entries that are not answered in the immediate next user message (e[y+1]), upstream
+    // synthesizes a tool_result with content: uvs ("[Tool result missing due to internal error]")
+    // and is_error: true.
+    //
+    // This happens frequently when:
+    // 1. Third-party OpenAI-compatible proxies emit static chunk IDs or flat assistant messages,
+    //    causing multi-turn tool_use items to be merged into a single assistant message;
+    // 2. Downstream history flattening splits or separates tool_use from its tool_result across turns.
+    //
+    // Upstream blindly flags these as internal errors, causing Claude to believe previous
+    // commands (like build, lint, git, edit) failed and loop repeatedly or fail on subsequent edits.
+    //
+    // The AST patch inspects the full conversation history for the original tool_result before
+    // falling back to synthesizing a missing error result.
+    id: 'tool-result-pairing-recovery',
+    name: 'Recover orphaned tool results from history in ensureToolResultPairing',
     ast: true,
   },
 ];
