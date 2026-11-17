@@ -340,22 +340,12 @@ const patches = [
     optional: true,
   },
   {
-    // ≤v2.1.149: if(Y!=="firstParty"&&Y!=="anthropicAws")return!1;
-    // v2.1.158+: if(q!=="firstParty"&&q!=="anthropicAws"&&($==="claude-opus-4-6"||…))return!1;
-    // v2.1.214+: if(r!=="firstParty"&&!d6(r)&&(t==="claude-opus-4-6"||…))return!1;
-    //   "anthropicAws" replaced by helper function !fn(var).
-    // v2.1.280+: if(Fin()&&(n==="claude-opus-4-6"||…))return!1;
-    //   Fin() now contains the provider check. Keep the original condition
-    //   behind the feature gate so disabling the patch restores upstream.
-    // v2.1.293+: if(jDn()&&(n==="claude-opus-4-6"||n==="claude-sonnet-4-6"||n.includes("haiku")&&n!=="claude-haiku-5-5"))return!1;
-    //   upstream added `&&n!=="claude-haiku-5-5"` exemption to the haiku check.
-    //   Relaxed to [^;]*? to tolerate model exclusion variants without breaking on future additions.
+    // Match inline, helper-call and locally cached provider predicates.
+    // Newer bundles share the predicate with a separate Haiku restriction.
     id: 'auto-mode-inline-gate',
     toggleable: true,
     name: 'Auto-mode unlock for third-party API (inline gate)',
-    pattern: /if\((?:([\w$]+)!=="firstParty"&&(?:\1!=="anthropicAws"|![\w$]+\(\1\))[^;]*|[\w$]+\(\)&&\([\w$]+==="claude-opus-4-6"\|\|[\w$]+==="claude-sonnet-4-6"\|\|[\w$]+\.includes\("haiku"\)[^;]*?\))\)return!1;/g,
-    replacer: (m) => `if(globalThis.__clawgodPatches?.[${JSON.stringify('auto-mode-inline-gate')}]===!1&&` + m.slice(3, -10) + `)return!1;`,
-    sentinel: '!=="firstParty"&&',
+    ast: true,
   },
   {
     // CLI subcommand registered via commander chain:
@@ -910,9 +900,18 @@ if (revert && !existsSync(CLEAN_SOURCE)) {
 // isGraph: files = { 'cli.original.cjs': '...', 'bunfs/_444.js': '...', ... }
 // else:    files = { 'cli.original.cjs': '...' }
 let files = {};
+// Keep embedded resources out of source patching, even with code extensions.
+const assetFiles = new Set();
+const pathMapFile = join(__dirname, 'pathmap.json');
+if (isGraph && existsSync(pathMapFile)) {
+  for (const entry of Object.values(JSON.parse(readFileSync(pathMapFile, 'utf8')))) {
+    if (entry.loader === 'text' || entry.loader === 'file') assetFiles.add(join(__dirname, entry.path));
+  }
+}
 if (isGraph) {
   files[TARGET] = readFileSync(TARGET, 'utf8');
   for (const f of readdirSync(GRAPH_DIR)) {
+    if (assetFiles.has(join(GRAPH_DIR, f))) continue;
     if (!/\.js$/.test(f) && !/\.mjs$/.test(f)) continue;
     files[join(GRAPH_DIR, f)] = readFileSync(join(GRAPH_DIR, f), 'utf8');
   }
@@ -946,15 +945,19 @@ if (captureCleanSource) {
 if (existsSync(CLEAN_SOURCE) && !verify) {
   try {
     const snapshot = JSON.parse(readFileSync(CLEAN_SOURCE, 'utf8'));
+    // Older snapshots also included resources; exclude those entries when
+    // validating the code inventory without restoring or modifying the assets.
+    const sourceFiles = Object.fromEntries(Object.entries(snapshot.files || {})
+      .filter(([name]) => !assetFiles.has(join(__dirname, name))));
     const names = Object.keys(files).map(name => relative(__dirname, name).replaceAll('\\', '/')).sort();
     if (snapshot.format !== 1 || snapshot.version !== version ||
         !snapshot.files || typeof snapshot.files !== 'object' ||
-        JSON.stringify(Object.keys(snapshot.files).sort()) !== JSON.stringify(names) ||
-        !names.every(name => typeof snapshot.files[name] === 'string')) {
+        JSON.stringify(Object.keys(sourceFiles).sort()) !== JSON.stringify(names) ||
+        !names.every(name => typeof sourceFiles[name] === 'string')) {
       throw new Error('version or file set does not match the installed source');
     }
     // Keep the active files untouched until all patch checks succeed.
-    files = Object.fromEntries(names.map(name => [join(__dirname, name), snapshot.files[name]]));
+    files = Object.fromEntries(names.map(name => [join(__dirname, name), sourceFiles[name]]));
     console.log(`Using clean source backup: ${names.length} files (v${version})`);
   } catch (error) {
     console.error(`Invalid clean-source backup: ${error.message}. Reinstall Claude ${version} without --no-upgrade.`);
