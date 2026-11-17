@@ -2,17 +2,19 @@
 
 [English](README.md) | [中文](README_ZH.md) | [日本語](README_JP.md)
 
-[![Latest](https://img.shields.io/github/v/release/0chencc/clawgod?style=flat&label=Latest)](https://github.com/0Chencc/clawgod/releases/latest)
-[![Released](https://img.shields.io/github/release-date/0chencc/clawgod?style=flat&label=Released)](https://github.com/0Chencc/clawgod/releases/latest)
-[![Downloads](https://img.shields.io/github/downloads/0chencc/clawgod/total?style=flat&label=Downloads)](https://github.com/0Chencc/clawgod/releases)
-[![Compat](https://img.shields.io/github/actions/workflow/status/0chencc/clawgod/compat-daily.yml?branch=main&style=flat&label=Compat)](https://github.com/0Chencc/clawgod/actions/workflows/compat-daily.yml)
-[![Claude tested](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/0Chencc/clawgod/badges/claude-version.json&style=flat)](https://github.com/0Chencc/clawgod/actions/workflows/compat-daily.yml)
+[![Latest](https://img.shields.io/github/v/release/karlorz/clawgod?style=flat&label=Latest)](https://github.com/karlorz/clawgod/releases/latest)
+[![Released](https://img.shields.io/github/release-date/karlorz/clawgod?style=flat&label=Released)](https://github.com/karlorz/clawgod/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/karlorz/clawgod/total?style=flat&label=Downloads)](https://github.com/karlorz/clawgod/releases)
+[![Compat](https://img.shields.io/github/actions/workflow/status/karlorz/clawgod/compat-daily.yml?branch=main&style=flat&label=Compat)](https://github.com/karlorz/clawgod/actions/workflows/compat-daily.yml)
+[![Claude tested](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/karlorz/clawgod/badges/claude-version.json&style=flat)](https://github.com/karlorz/clawgod/actions/workflows/compat-daily.yml)
 
 > God mode for [Claude Code](https://docs.anthropic.com/en/docs/claude-code).
 
 **This is NOT a third-party Claude Code client.** ClawGod is a runtime patch applied on top of the official Claude Code. It works with any version — as Claude Code updates, ClawGod automatically re-extracts and re-patches against the new version on the next launch.
 
 **Privacy protections are enabled by default:** ClawGod neutralizes known location/proxy signals embedded in the date prompt and, since v2.3.0, blocks automatic Git origin and environment collection for `x-claude-code-wiggly-dove`. See [Privacy Protections](#privacy-protections) for coverage and configuration.
+
+Derived from [0Chencc/clawgod](https://github.com/0Chencc/clawgod) (GPL-3.0). This fork’s install and update endpoints are **only** [karlorz/clawgod](https://github.com/karlorz/clawgod).
 
 ## Prerequisites
 
@@ -29,12 +31,12 @@ Install these **before** running the ClawGod installer:
 
 **macOS / Linux:**
 ```bash
-curl -fsSL https://github.com/0Chencc/clawgod/releases/latest/download/install.sh | bash
+curl -fsSL https://github.com/karlorz/clawgod/releases/latest/download/install.sh | bash
 ```
 
 **Windows (PowerShell):**
 ```powershell
-irm https://github.com/0Chencc/clawgod/releases/latest/download/install.ps1 | iex
+irm https://github.com/karlorz/clawgod/releases/latest/download/install.ps1 | iex
 ```
 
 Green logo = patched. Orange logo = original.
@@ -232,12 +234,12 @@ If you'd rather invoke the installer directly (same effect, both paths fetch the
 
 **macOS / Linux:**
 ```bash
-curl -fsSL https://github.com/0Chencc/clawgod/releases/latest/download/install.sh | bash
+curl -fsSL https://github.com/karlorz/clawgod/releases/latest/download/install.sh | bash
 ```
 
 **Windows:**
 ```powershell
-irm https://github.com/0Chencc/clawgod/releases/latest/download/install.ps1 | iex
+irm https://github.com/karlorz/clawgod/releases/latest/download/install.ps1 | iex
 ```
 
 If you'd rather drop ClawGod and use Anthropic's original `claude update` (which manages its own paths and would overwrite our launcher), uninstall first:
@@ -250,13 +252,13 @@ bash ~/.clawgod/install.sh --uninstall
 
 **macOS / Linux:**
 ```bash
-curl -fsSL https://github.com/0Chencc/clawgod/releases/latest/download/install.sh | bash -s -- --uninstall
+curl -fsSL https://github.com/karlorz/clawgod/releases/latest/download/install.sh | bash -s -- --uninstall
 hash -r  # refresh shell cache
 ```
 
 **Windows:**
 ```powershell
-irm https://github.com/0Chencc/clawgod/releases/latest/download/install.ps1 -OutFile install.ps1; .\install.ps1 -Uninstall
+irm https://github.com/karlorz/clawgod/releases/latest/download/install.ps1 -OutFile install.ps1; .\install.ps1 -Uninstall
 ```
 
 Uninstall restores `claude.orig → claude` and removes the `clawgod` alias.

@@ -10,6 +10,39 @@ Upstream product URL / domain must not reappear in installers or self-update pat
 
 ---
 
+## v2.3.1-0 — merge upstream v2.3.1 + runnable bun probe (2026-11-17)
+
+**Base:** upstream `v2.3.1` + fork train. Self-version / tag: `2.3.1-0` / `v2.3.1-0`. Compare: `v2.3.0-0...v2.3.1-0`.
+
+### From upstream (prefer upstream)
+
+| Area | Change |
+|------|--------|
+| **Auto-mode** | AST match for inline, helper, and cached local provider predicates (Claude 2.1.323+); model-only and first-party restrictions stay upstream |
+| **Embedded assets** | Disk `import.meta.require` must not execute skill templates / text assets (`#233`); loader metadata required for `--no-upgrade` |
+| **CI** | Install ripgrep from GitHub releases (no Ubuntu mirror DNS); skip compat issues when install never started |
+
+### Fork deltas
+
+| Area | Change |
+|------|--------|
+| **Launcher / installer** | Probe bun with `--version`. Skip PATH wrappers that are executable but cannot exec (musl PT_INTERP missing, deleted target, wrong-OS stub). Fall back to `~/.bun/bin/bun`, then install official bun. |
+| **Product URLs** | Install / update-check / `claude update` / reinstall / import assets / patch-failure retry → `karlorz/clawgod` only |
+| **compat-daily issues** | Open on any non-PR failure after install actually ran (keep fork policy + upstream install-step gate) |
+
+### Verify after install
+
+```bash
+grep -E 'karlorz/clawgod|0Chencc' ~/.clawgod/cli.cjs | head
+# expect karlorz only
+cat ~/.clawgod/.clawgod-version
+# expect 2.3.1-0 (or newer fork train)
+```
+
+Tag policy: never move upstream `v2.3.1`; ship fork as `v2.3.1-0`.
+
+---
+
 ## v1.9.3-1 — argv0 launcher fix for agent-aware supervisors (2026-09-07)
 
 | Area | Change |

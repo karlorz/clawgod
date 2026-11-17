@@ -109,11 +109,24 @@ if ($nodeVer -lt 18) {
 
 # --- Ensure Bun (runtime that executes the patched cli.js) ------------
 
+function Test-ClawGodBun {
+    param([string]$Bin)
+    if ([string]::IsNullOrWhiteSpace($Bin)) { return $false }
+    if (-not (Test-Path -LiteralPath $Bin)) { return $false }
+    try {
+        $out = & $Bin --version 2>$null | Select-Object -First 1
+        return -not [string]::IsNullOrWhiteSpace("$out")
+    } catch {
+        return $false
+    }
+}
+
 $BunBin = $null
 try { $BunBin = (Get-Command bun -ErrorAction Stop).Source } catch {}
-if (-not $BunBin) {
+if (-not (Test-ClawGodBun $BunBin)) {
+    $BunBin = $null
     $homeBun = Join-Path $env:USERPROFILE ".bun\bin\bun.exe"
-    if (Test-Path $homeBun) { $BunBin = $homeBun }
+    if (Test-ClawGodBun $homeBun) { $BunBin = $homeBun }
 }
 if (-not $BunBin) {
     Write-Dim "Installing Bun (required runtime for v2.1.113+ cli.js) ..."
@@ -121,7 +134,7 @@ if (-not $BunBin) {
         Invoke-Expression "$(Invoke-RestMethod https://bun.sh/install.ps1)" 2>$null | Out-Null
     } catch {}
     $BunBin = Join-Path $env:USERPROFILE ".bun\bin\bun.exe"
-    if (-not (Test-Path $BunBin)) {
+    if (-not (Test-ClawGodBun $BunBin)) {
         Write-Err "Bun installation failed. Install manually: https://bun.sh/install"
         exit 1
     }

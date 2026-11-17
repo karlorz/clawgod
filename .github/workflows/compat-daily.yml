@@ -91,6 +91,9 @@ jobs:
         # stock Bun lacks; the shim answers it. Pure JS, so it runs on Node.
         run: node src/shared/bun-ant-shim.test.mjs
 
+      - name: Run bun resolver regression tests
+        run: bash src/shared/resolve-bun.test.sh
+
       - name: Check embedded JavaScript syntax
         shell: bash
         run: |
