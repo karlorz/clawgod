@@ -2,17 +2,19 @@
 
 [English](README.md) | [中文](README_ZH.md) | [日本語](README_JP.md)
 
-[![Latest](https://img.shields.io/github/v/release/0chencc/clawgod?style=flat&label=Latest)](https://github.com/0Chencc/clawgod/releases/latest)
-[![Released](https://img.shields.io/github/release-date/0chencc/clawgod?style=flat&label=Released)](https://github.com/0Chencc/clawgod/releases/latest)
-[![Downloads](https://img.shields.io/github/downloads/0chencc/clawgod/total?style=flat&label=Downloads)](https://github.com/0Chencc/clawgod/releases)
-[![Compat](https://img.shields.io/github/actions/workflow/status/0chencc/clawgod/compat-daily.yml?branch=main&style=flat&label=Compat)](https://github.com/0Chencc/clawgod/actions/workflows/compat-daily.yml)
-[![Claude tested](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/0Chencc/clawgod/badges/claude-version.json&style=flat)](https://github.com/0Chencc/clawgod/actions/workflows/compat-daily.yml)
+[![Latest](https://img.shields.io/github/v/release/karlorz/clawgod?style=flat&label=Latest)](https://github.com/karlorz/clawgod/releases/latest)
+[![Released](https://img.shields.io/github/release-date/karlorz/clawgod?style=flat&label=Released)](https://github.com/karlorz/clawgod/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/karlorz/clawgod/total?style=flat&label=Downloads)](https://github.com/karlorz/clawgod/releases)
+[![Compat](https://img.shields.io/github/actions/workflow/status/karlorz/clawgod/compat-daily.yml?branch=main&style=flat&label=Compat)](https://github.com/karlorz/clawgod/actions/workflows/compat-daily.yml)
+[![Claude tested](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/karlorz/clawgod/badges/claude-version.json&style=flat)](https://github.com/karlorz/clawgod/actions/workflows/compat-daily.yml)
 
 > [Claude Code](https://docs.anthropic.com/en/docs/claude-code) 上帝模式。
 
 **这不是第三方 Claude Code 客户端。** ClawGod 是作用在官方 Claude Code 之上的运行时补丁。它兼容任何版本——当 Claude Code 升级，ClawGod 会在下次启动时自动从新版本重新抽取并重新打补丁。
 
 **默认启用隐私保护：** 中和日期提示词中已识别的地区/代理隐写，并从 v2.3.0 起阻断 `x-claude-code-wiggly-dove` 自动采集 Git origin 和环境信息。保护范围和配置见[隐私保护](#隐私保护)。
+
+派生自 [0Chencc/clawgod](https://github.com/0Chencc/clawgod)（GPL-3.0）。本 fork 的安装与更新入口**仅**为 [karlorz/clawgod](https://github.com/karlorz/clawgod)。
 
 ## 前置依赖
 
@@ -29,12 +31,12 @@
 
 **macOS / Linux:**
 ```bash
-curl -fsSL https://github.com/0Chencc/clawgod/releases/latest/download/install.sh | bash
+curl -fsSL https://github.com/karlorz/clawgod/releases/latest/download/install.sh | bash
 ```
 
 **Windows (PowerShell):**
 ```powershell
-irm https://github.com/0Chencc/clawgod/releases/latest/download/install.ps1 | iex
+irm https://github.com/karlorz/clawgod/releases/latest/download/install.ps1 | iex
 ```
 
 绿色 Logo = 已 Patch。橙色 Logo = 原版。
@@ -229,12 +231,12 @@ claude update --no-upgrade        # 不下载新版，只用最新 patcher 重�
 
 **macOS / Linux:**
 ```bash
-curl -fsSL https://github.com/0Chencc/clawgod/releases/latest/download/install.sh | bash
+curl -fsSL https://github.com/karlorz/clawgod/releases/latest/download/install.sh | bash
 ```
 
 **Windows:**
 ```powershell
-irm https://github.com/0Chencc/clawgod/releases/latest/download/install.ps1 | iex
+irm https://github.com/karlorz/clawgod/releases/latest/download/install.ps1 | iex
 ```
 
 如果你想脱离 ClawGod、使用 Anthropic 原本的 `claude update`（它会写到自己管的目录、并把我们的 launcher 替换掉），请先卸载：
@@ -247,13 +249,13 @@ bash ~/.clawgod/install.sh --uninstall
 
 **macOS / Linux:**
 ```bash
-curl -fsSL https://github.com/0Chencc/clawgod/releases/latest/download/install.sh | bash -s -- --uninstall
+curl -fsSL https://github.com/karlorz/clawgod/releases/latest/download/install.sh | bash -s -- --uninstall
 hash -r  # 刷新 shell 缓存
 ```
 
 **Windows:**
 ```powershell
-irm https://github.com/0Chencc/clawgod/releases/latest/download/install.ps1 -OutFile install.ps1; .\install.ps1 -Uninstall
+irm https://github.com/karlorz/clawgod/releases/latest/download/install.ps1 -OutFile install.ps1; .\install.ps1 -Uninstall
 ```
 
 卸载会把 `claude.orig` 还原成 `claude`，并移除 `clawgod` 别名。

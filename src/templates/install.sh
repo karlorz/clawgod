@@ -101,17 +101,39 @@ if [ "$NODE_VERSION" -lt 18 ]; then
 fi
 
 # ─── Ensure Bun (runtime that executes the patched cli.js) ─────────────
+# CLAWGOD_BUN_RESOLVER_BEGIN
+# A PATH "bun" can be -x and still fail at exec: musl ELF whose PT_INTERP
+# (/lib/ld-musl-*.so.1) is missing, wrappers whose target was deleted, or
+# a wrong-OS stub. Probe with --version; do not trust command -v / -x alone.
+clawgod_bun_works() {
+  [ -n "${1:-}" ] && [ -x "$1" ] && "$1" --version >/dev/null 2>&1
+}
+
+clawgod_resolve_bun() {
+  local baked="${1:-}"
+  local path_bun=""
+  if command -v bun >/dev/null 2>&1; then
+    path_bun="$(command -v bun)"
+  fi
+  local cand
+  for cand in "$baked" "$HOME/.bun/bin/bun" "$path_bun"; do
+    if clawgod_bun_works "$cand"; then
+      printf '%s\n' "$cand"
+      return 0
+    fi
+  done
+  return 1
+}
+# CLAWGOD_BUN_RESOLVER_END
 
 BUN_BIN=""
-if command -v bun &>/dev/null; then
-  BUN_BIN=$(command -v bun)
-elif [ -x "$HOME/.bun/bin/bun" ]; then
-  BUN_BIN="$HOME/.bun/bin/bun"
+if resolved="$(clawgod_resolve_bun)"; then
+  BUN_BIN="$resolved"
 else
   dim "Installing Bun (required runtime for v2.1.113+ cli.js) ..."
   curl -fsSL https://bun.sh/install | bash >/dev/null 2>&1 || true
   BUN_BIN="$HOME/.bun/bin/bun"
-  if [ ! -x "$BUN_BIN" ]; then
+  if ! clawgod_bun_works "$BUN_BIN"; then
     warn "Bun installation failed. Install manually: https://bun.sh/install"
     exit 1
   fi
@@ -172,17 +194,29 @@ info "ripgrep: $(rg --version | head -1)"
 # ─── Handle --no-upgrade (re-patch the installed version) ───────────
 mkdir -p "$CLAWGOD_DIR" "$BIN_DIR"
 
+cat > "$CLAWGOD_DIR/acorn.mjs" << 'ACORN_EOF'
+{{CLAWGOD:acorn.mjs}}
+ACORN_EOF
+cat > "$CLAWGOD_DIR/acorn.LICENSE" << 'ACORN_LICENSE_EOF'
+{{CLAWGOD:acorn.LICENSE}}
+ACORN_LICENSE_EOF
+
 if [ "$NO_UPGRADE" = "1" ]; then
   if [ ! -f "$CLAWGOD_DIR/cli.original.cjs" ]; then
     warn "--no-upgrade requires an existing installation."
     warn "Run a full install first (without --no-upgrade)."
     exit 1
   fi
-  if [ -f "$CLAWGOD_DIR/source-backup.json" ]; then
+  if [ -f "$CLAWGOD_DIR/source-backup.json" ] && {
+    [ ! -f "$CLAWGOD_DIR/pathmap.json" ] || node -e '
+const paths = require(process.argv[1]);
+process.exit(Object.values(paths).every(entry => typeof entry.loader === "string") ? 0 : 1);
+' "$CLAWGOD_DIR/pathmap.json";
+  }; then
     info "Using complete clean-source backup (--no-upgrade)"
   else
-    # Old installations have no clean chunk backup. Use the installer's version
-    # stamp, falling back to the entry header, to avoid silently upgrading.
+    # Old backups lack clean chunks or asset loader metadata. Recover the exact
+    # installed version so --no-upgrade also repairs asset loading (#233).
     VERSION=$(node -e '
 const fs = require("fs");
 const source = fs.readFileSync(process.argv[1], "utf8");
@@ -452,12 +486,6 @@ info "Bun.ant runtime shim created (bun-ant-shim.cjs)"
 
 # ─── Write universal patcher ───────────────────────────
 
-cat > "$CLAWGOD_DIR/acorn.mjs" << 'ACORN_EOF'
-{{CLAWGOD:acorn.mjs}}
-ACORN_EOF
-cat > "$CLAWGOD_DIR/acorn.LICENSE" << 'ACORN_LICENSE_EOF'
-{{CLAWGOD:acorn.LICENSE}}
-ACORN_LICENSE_EOF
 cat > "$CLAWGOD_DIR/ast-patches.mjs" << 'AST_PATCHES_EOF'
 {{CLAWGOD:ast-patches.mjs}}
 AST_PATCHES_EOF
@@ -486,9 +514,9 @@ if [ "$patch_status" -ne 0 ]; then
   warn ""
   warn "The new Claude Code build (${NATIVE_BIN_LABEL:-unknown}) is not yet supported by this ClawGod release."
   warn "If the log says 'regex stale', retry with --tolerate-stale to keep the affected gates upstream:"
-  warn "  curl -fsSL https://raw.githubusercontent.com/0Chencc/clawgod/main/install.sh | bash -s -- --tolerate-stale"
+  warn "  curl -fsSL https://github.com/${CLAWGOD_GITHUB_REPO}/releases/latest/download/install.sh | bash -s -- --tolerate-stale"
   warn "To install or roll back to a known compatible version, run:"
-  warn "  curl -fsSL https://github.com/0Chencc/clawgod/releases/latest/download/install.sh | bash -s -- --version <version>"
+  warn "  curl -fsSL https://github.com/${CLAWGOD_GITHUB_REPO}/releases/latest/download/install.sh | bash -s -- --version <version>"
   warn "(Note: 'claude update --version' will fail on unpatched Claude Code with \"unknown option '--version'\")"
   exit "$patch_status"
 fi
@@ -707,13 +735,17 @@ if [ ! -f \"\$CLAWGOD_CLI\" ]; then
   echo \"clawgod: or remove this launcher:  rm \\\"\$0\\\"\" >&2
   exit 127
 fi
-if [ ! -x \"\$BUN_BIN\" ]; then
-  if command -v bun >/dev/null 2>&1; then BUN_BIN=\"\$(command -v bun)\"; fi
-fi
-if [ ! -x \"\$BUN_BIN\" ]; then
-  echo \"clawgod: bun runtime not found at \$BUN_BIN\" >&2
-  echo \"clawgod: install bun  curl -fsSL https://bun.sh/install | bash\" >&2
-  exit 127
+clawgod_bun_works() { [ -n \"\$1\" ] && [ -x \"\$1\" ] && \"\$1\" --version >/dev/null 2>&1; }
+if ! clawgod_bun_works \"\$BUN_BIN\"; then
+  if clawgod_bun_works \"\$HOME/.bun/bin/bun\"; then
+    BUN_BIN=\"\$HOME/.bun/bin/bun\"
+  elif command -v bun >/dev/null 2>&1 && clawgod_bun_works \"\$(command -v bun)\"; then
+    BUN_BIN=\"\$(command -v bun)\"
+  else
+    echo \"clawgod: bun runtime not runnable at \$BUN_BIN\" >&2
+    echo \"clawgod: install bun  curl -fsSL https://bun.sh/install | bash\" >&2
+    exit 127
+  fi
 fi
 export CLAUDE_CODE_EXECPATH=\"$CLAUDE_BIN.orig\"
 export HERDR_AGENT=\"\${HERDR_AGENT:-claude}\"

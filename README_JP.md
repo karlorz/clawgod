@@ -2,17 +2,19 @@
 
 [English](README.md) | [中文](README_ZH.md) | [日本語](README_JP.md)
 
-[![Latest](https://img.shields.io/github/v/release/0chencc/clawgod?style=flat&label=Latest)](https://github.com/0Chencc/clawgod/releases/latest)
-[![Released](https://img.shields.io/github/release-date/0chencc/clawgod?style=flat&label=Released)](https://github.com/0Chencc/clawgod/releases/latest)
-[![Downloads](https://img.shields.io/github/downloads/0chencc/clawgod/total?style=flat&label=Downloads)](https://github.com/0Chencc/clawgod/releases)
-[![Compat](https://img.shields.io/github/actions/workflow/status/0chencc/clawgod/compat-daily.yml?branch=main&style=flat&label=Compat)](https://github.com/0Chencc/clawgod/actions/workflows/compat-daily.yml)
-[![Claude tested](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/0Chencc/clawgod/badges/claude-version.json&style=flat)](https://github.com/0Chencc/clawgod/actions/workflows/compat-daily.yml)
+[![Latest](https://img.shields.io/github/v/release/karlorz/clawgod?style=flat&label=Latest)](https://github.com/karlorz/clawgod/releases/latest)
+[![Released](https://img.shields.io/github/release-date/karlorz/clawgod?style=flat&label=Released)](https://github.com/karlorz/clawgod/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/karlorz/clawgod/total?style=flat&label=Downloads)](https://github.com/karlorz/clawgod/releases)
+[![Compat](https://img.shields.io/github/actions/workflow/status/karlorz/clawgod/compat-daily.yml?branch=main&style=flat&label=Compat)](https://github.com/karlorz/clawgod/actions/workflows/compat-daily.yml)
+[![Claude tested](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/karlorz/clawgod/badges/claude-version.json&style=flat)](https://github.com/karlorz/clawgod/actions/workflows/compat-daily.yml)
 
 > [Claude Code](https://docs.anthropic.com/en/docs/claude-code) ゴッドモード。
 
 **これはサードパーティ製の Claude Code クライアントではありません。** ClawGod は公式 Claude Code の上に適用されるランタイムパッチです。どのバージョンにも対応し、Claude Code が更新されると次回起動時に自動的に新バージョンから再抽出・再パッチを行います。
 
 **プライバシー保護はデフォルトで有効です：** 日付プロンプトに埋め込まれる既知の地域・プロキシ情報を無効化し、v2.3.0 からは `x-claude-code-wiggly-dove` による Git origin と環境情報の自動収集もブロックします。対象範囲と設定は[プライバシー保護](#プライバシー保護)を参照してください。
+
+[0Chencc/clawgod](https://github.com/0Chencc/clawgod)（GPL-3.0）からの派生です。この fork のインストールと更新先は **[karlorz/clawgod](https://github.com/karlorz/clawgod) のみ**です。
 
 ## 必要条件
 
@@ -29,12 +31,12 @@ ClawGod インストーラ実行**前**に揃えておくもの：
 
 **macOS / Linux:**
 ```bash
-curl -fsSL https://github.com/0Chencc/clawgod/releases/latest/download/install.sh | bash
+curl -fsSL https://github.com/karlorz/clawgod/releases/latest/download/install.sh | bash
 ```
 
 **Windows (PowerShell):**
 ```powershell
-irm https://github.com/0Chencc/clawgod/releases/latest/download/install.ps1 | iex
+irm https://github.com/karlorz/clawgod/releases/latest/download/install.ps1 | iex
 ```
 
 緑のロゴ = パッチ適用済み。オレンジのロゴ = オリジナル。
@@ -226,12 +228,12 @@ claude update --no-upgrade        # インストール済みの Claude バージ
 
 **macOS / Linux:**
 ```bash
-curl -fsSL https://github.com/0Chencc/clawgod/releases/latest/download/install.sh | bash
+curl -fsSL https://github.com/karlorz/clawgod/releases/latest/download/install.sh | bash
 ```
 
 **Windows:**
 ```powershell
-irm https://github.com/0Chencc/clawgod/releases/latest/download/install.ps1 | iex
+irm https://github.com/karlorz/clawgod/releases/latest/download/install.ps1 | iex
 ```
 
 ClawGod を外して Anthropic 本来の `claude update`（独自に管理されたパスへ書き込み、私たちの launcher を上書きします）を使いたい場合は、先にアンインストールしてください：
@@ -244,13 +246,13 @@ bash ~/.clawgod/install.sh --uninstall
 
 **macOS / Linux:**
 ```bash
-curl -fsSL https://github.com/0Chencc/clawgod/releases/latest/download/install.sh | bash -s -- --uninstall
+curl -fsSL https://github.com/karlorz/clawgod/releases/latest/download/install.sh | bash -s -- --uninstall
 hash -r  # シェルキャッシュをリフレッシュ
 ```
 
 **Windows:**
 ```powershell
-irm https://github.com/0Chencc/clawgod/releases/latest/download/install.ps1 -OutFile install.ps1; .\install.ps1 -Uninstall
+irm https://github.com/karlorz/clawgod/releases/latest/download/install.ps1 -OutFile install.ps1; .\install.ps1 -Uninstall
 ```
 
 アンインストールは `claude.orig` を `claude` に戻し、`clawgod` エイリアスを削除します。
